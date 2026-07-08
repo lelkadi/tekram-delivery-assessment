@@ -5,7 +5,10 @@
 ## Repository layout
 
 - `docs/00-project-management-plan.md` — delivery plan, priorities, 48h timeline
-- `docs/` — all written deliverables (architecture, schema, runbooks, leadership, AI strategy)
+- `docs/architecture.md` — Part 1: system/container/component diagrams, data flows, scalability, security
+- `docs/database-schema.md` — Part 3: ERD, DDL, indexes, scaling notes
+- `docs/technical-decisions.md` — Part 8: stack + design decisions log (incl. .NET 8/ASP.NET Core, Scalar)
+- `docs/` — all other written deliverables (runbooks, DevOps, leadership, AI strategy)
 - `.ai-roster/` — multi-agent workflow definition (roles, instructions, GitHub-issue state machine)
 - Backend coding challenge (Part 2) lives at the repo root under `src/` once scaffolded
 

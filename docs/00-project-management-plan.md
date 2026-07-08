@@ -76,9 +76,9 @@ call between the two products. Full contract: [.ai-roster/rules/delegation.md](.
 ## 4. Deliverables Checklist
 
 - [ ] GitHub repository (public/shared at submission), clean history
-- [ ] `docs/architecture.md` + diagrams (Part 1)
+- [x] `docs/architecture.md` + diagrams (Part 1)
 - [ ] Working backend: auth, restaurants, orders + unit tests (Part 2)
-- [ ] `docs/database-schema.md` + ERD (Part 3)
+- [x] `docs/database-schema.md` + ERD (Part 3)
 - [ ] `docs/incident-runbook.md` (Part 4)
 - [ ] `docs/devops.md` (Part 5)
 - [ ] `docs/leadership.md` (Part 6)
