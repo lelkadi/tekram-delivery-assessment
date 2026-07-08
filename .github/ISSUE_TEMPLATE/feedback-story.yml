@@ -1,0 +1,49 @@
+name: Feedback Story
+description: Atomic user story derived from founder feedback (filed by pm-intake)
+labels: ["status:0-intake"]
+body:
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: "As a <role>, I want <capability>, so that <benefit>."
+    validations:
+      required: true
+  - type: textarea
+    id: founder-feedback
+    attributes:
+      label: Founder Feedback (verbatim)
+      description: The founder's exact words. If derived rather than stated, say "(derived, not founder-stated)".
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Checkbox list; each item objectively checkable from the running app.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: checkboxes
+    id: area
+    attributes:
+      label: Area
+      options:
+        - label: backend
+        - label: frontend
+        - label: db
+        - label: infra
+        - label: shared
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0-blocker
+        - P1-high
+        - P2-normal
+        - P3-low
+    validations:
+      required: true
