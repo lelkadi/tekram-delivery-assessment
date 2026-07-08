@@ -38,16 +38,16 @@ git --version   # want >= 2.39
 ```
 
 ## 4. `js-yaml` dependency
-`sync-agents.js` requires `js-yaml`. Declare it as a workspace devDependency so it's hoisted/resolvable:
+`sync-agents.js` requires `js-yaml`. Install the workspace devDependency:
 ```bash
-cd /Users/loukan/projects/loukan/careeree
-corepack pnpm add -D js-yaml -w
+cd /Users/loukan/projects/loukan/tekram-delivery-assessment
+npm install
 node -e "require('js-yaml')"   # must not throw
 ```
 
 ## 5. Worktree scaffolding
 ```bash
-mkdir -p /Users/loukan/.agent-worktrees/tekram-delivery-assessment /Users/loukan/.agent-worktrees/.lanes
+mkdir -p ~/.agent-worktrees/tekram-delivery-assessment ~/.agent-worktrees/.lanes
 ```
 
 ## 6. GitHub labels
@@ -67,10 +67,8 @@ User Story" when running `gh issue create --repo lelkadi/tekram-delivery-assessm
 node .ai-roster/scripts/sync-agents.js
 ```
 Confirm:
-- `.claude/agents/*.md` created (9 files), each with valid frontmatter (`name`, `description`, `tools`, `model`).
-- `.agents/agents/*/agent.json` created for the 4 Antigravity roles (web-engineer, backend-engineer,
-  worker-engineer, qa); each currently has `model: "TODO-VERIFY-antigravity-model"` — **you must replace
-  this with a real model id from Antigravity's live model menu before using those agents** (open decision #6).
+- `.claude/agents/*.md` created (7 files), each with valid frontmatter (`name`, `description`, `tools`, `model`).
+- `.agents/agents/*/agent.json` created for Antigravity roles (if that runtime's model ids are verified — the roster has deprecated unverified Antigravity model references).
 
 ## 9. Branch protection on `main` (recommended before agents start opening PRs)
 ```bash
@@ -83,10 +81,9 @@ gh api repos/lelkadi/tekram-delivery-assessment/branches/main/protection -X PUT 
 (Tune to taste — at minimum, require a PR rather than direct pushes to `main`.)
 
 ## 10. Optional: CI state-machine enforcement (P6, not required for P0–P5)
-A `.github/workflows/state-machine.yml` that validates label transitions and runs `pnpm -r test`
+A `.github/workflows/state-machine.yml` that validates label transitions and runs `dotnet test`
 against a CI-only Postgres/Redis service container (isolated from the local dev lane stack). Build
-this only if the manual flow proves out first — see the roadmap in
-`.ai-roster/reports/03-architect-unified-plan.md` §9.
+this only if the manual flow proves out first.
 
 ---
 
@@ -96,8 +93,8 @@ gh auth status                                   # ✅ authenticated
 git --version                                    # ✅ >= 2.39
 node -e "require('js-yaml')"                     # ✅ no throw
 gh label list --repo lelkadi/tekram-delivery-assessment | wc -l    # ✅ ~26 labels
-ls .claude/agents/ | wc -l                       # ✅ 9
-ls .agents/agents/ | wc -l                       # ✅ 4
+ls .claude/agents/ | wc -l                       # ✅ 7
+ls .opencode/agents/ | wc -l                     # ✅ 4
 ```
 
 Once all of the above pass, the workflow is live. Start with **P5** from the roadmap: drive one real

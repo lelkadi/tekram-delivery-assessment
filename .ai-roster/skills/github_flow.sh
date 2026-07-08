@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# github_flow.sh — state-machine skill for the Careeree issue-driven agent workflow.
+# github_flow.sh — state-machine skill for the Tekram issue-driven agent workflow.
 # Worktree-aware, claim-aware, lane-aware. Used by Claude Code, opencode, and Antigravity agents.
 #
 # Worktrees are PER AGENT ROLE, not per issue: each $GH_AGENT_ID gets exactly one persistent

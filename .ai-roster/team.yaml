@@ -45,6 +45,11 @@ agents:
     environment: "opencode"
     opencode_model: "deepseek/deepseek-v4-pro"
     opencode_mode: "primary"
+    opencode_temperature: 0.15   # highly deterministic — verification-grade briefs, diff checks
+    opencode_options:
+      thinking:
+        type: enabled
+        reasoning_effort: high   # balanced reasoning (not max) — orchestrates, doesn't design
     write_scope: []   # never edits src/**, web/**, or tests/** directly — dispatch + verify only
     instructions_file: "eng_lead_instructions.md"
     skills: ["github_flow"]
@@ -84,8 +89,13 @@ agents:
   architect-spec:
     display_name: "Architect — Spec"
     stage: "2-needs-spec -> 3-ready-for-dev"
-    environment: "claude-code"
-    claude_model_alias: "opus"
+    environment: "opencode"
+    opencode_model: "deepseek/deepseek-v4-pro"
+    opencode_temperature: 0.2    # deterministic — architecture, schemas, and specs must be precise
+    opencode_options:
+      thinking:
+        type: enabled
+        reasoning_effort: max    # deep reasoning — cross-cutting architecture design warrants max effort
     tools: ["Read", "Grep", "Glob", "Bash"]
     instructions_file: "architect_spec_instructions.md"
 
@@ -98,6 +108,7 @@ agents:
     stage: "3-ready-for-dev -> 5-in-review"
     environment: "opencode"
     opencode_model: "deepseek/deepseek-v4-flash"
+    opencode_temperature: 0.4    # moderately creative — UI/frontend benefits from some variation
     # Conditional role: only spun up for the P4 frontend demo after all P0-P3 deliverables exist.
     write_scope: ["web/**"]
     instructions_file: "web_instructions.md"
@@ -108,6 +119,7 @@ agents:
     stage: "3-ready-for-dev -> 5-in-review"
     environment: "opencode"
     opencode_model: "deepseek/deepseek-v4-flash"
+    opencode_temperature: 0.25   # mostly deterministic — backend code needs precision, slight creativity OK
     write_scope: ["src/**", "tests/**"]
     instructions_file: "backend_instructions.md"
     skills: ["github_flow"]

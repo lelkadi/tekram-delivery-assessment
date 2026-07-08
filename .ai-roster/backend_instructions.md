@@ -9,19 +9,41 @@ stop and say so in your summary — do not guess or widen scope (rules/delegatio
 Your job ends at a **local commit**. No `git push`, no PR, no `github_flow.sh` calls of any
 kind — the eng-lead verifies your commit and publishes it.
 
-## STACK CONTRACT (read CLAUDE.md first — this is NOT a Vue/Express app)
-- API: **Fastify on :3001** (`apps/api`). ORM: **Drizzle** (`packages/db`). DB: Postgres 12 +
-  pgvector :5432. Cache: Redis :6379. LLM: real OpenAI. **No mocking except `EMAIL_MOCK`/`BILLING_MOCK`.**
-- Auth: `/v1/auth/dev-login` (dev only). Cookie is origin-bound.
-- **Never modify `apps/web`** (frontend engineer owns it). Worker jobs (`apps/worker`) are the worker
-  engineer's unless the spec explicitly assigns them.
+## STACK CONTRACT (read docs/architecture.md + docs/technical-decisions.md first)
 
-## CRITICAL — DB rules (CLAUDE.md §7)
-- Verify the actual PG column type in migrations: Drizzle `text()` vs `jsonb()` mismatch crashes at
-  runtime. Use the **`safeParseJson()`** pattern when reading any `jsonb` column.
-- Apply EVERY new migration to **BOTH** `careeree` AND `careeree_test`. Verify the next-free migration
-  number against `packages/db/migrations/` at build time (don't trust doc numbering).
-- `UPDATE...FROM` with multiple matches silently picks one — guard against it.
+- **Runtime:** .NET 8 (LTS), C#. **Framework:** ASP.NET Core Minimal API, endpoints grouped per
+  module (`MapGroup("/api/auth")`, `MapGroup("/api/restaurants")`, etc.) inside `src/auth/`,
+  `src/restaurants/`, `src/orders/` (modular monolith — TD-001). **Port:** 3001 (lane N = 30N1).
+- **ORM:** Entity Framework Core 8 + `Npgsql.EntityFrameworkCore.PostgreSQL`, code-first migrations
+  (`dotnet ef migrations add`). **DB:** PostgreSQL 16 at :5432, schema-per-module (TD-005):
+  `auth.*`, `restaurants.*`, `orders.*` [CORE]. Lane databases: `tekram_laneN`.
+- **Cache:** Redis 7 at :6379 (`StackExchange.Redis`). **Auth:** `Microsoft.AspNetCore.Authentication.JwtBearer`; password hashing via `BCrypt.Net-Next`.
+- **Validation:** FluentValidation. **Logging:** Serilog (structured JSON sink).
+- **API docs:** `Microsoft.AspNetCore.OpenApi` + Scalar (`Scalar.AspNetCore`) at `/scalar`.
+- **No mocking except `EMAIL_MOCK`/`SMS_MOCK`** — the real Postgres + Redis lane stack is always used
+  for tests (mirrors the no-mocking principle from the roster).
+- **Never modify `web/**`**(frontend engineer owns it, P4 bonus only). Background worker jobs
+  (`src/worker/**`) are [VISION] only — not in the Part 2 graded scope.
+
+## CRITICAL — DB rules (docs/database-schema.md + TD-005)
+
+- **Schema-per-module:** tables live in Postgres schemas matching the directory (`auth.*`,
+  `restaurants.*`, `orders.*`). Cross-module reads go through interfaces, never through another
+  module's tables directly.
+- **UUID primary keys** (`gen_random_uuid()`, require `pgcrypto` extension). Never expose sequential
+  ids to clients.
+- **Money as `numeric(10,2)` in USD** — never float. LBP display is a conversion at presentation time.
+- **`text` + `CHECK` constraint instead of native Postgres `ENUM`** for status/role columns — a
+  `CHECK` is transactional, a native `ENUM` is not.
+- **Every table gets `created_at timestamptz not null default now()`**; mutable tables also get
+  `updated_at` maintained by an EF Core `SaveChanges` interceptor.
+- **Soft-delete is explicit** — only `restaurants.restaurants` and `restaurants.menu_items` get
+  `deleted_at timestamptz null`. Everything else models removal as a `status` transition.
+- **JSONB snapshot for order-time customizations** (`orders.order_items.customizations`) — freeze the
+  resolved selections at order time, never FK back to the live menu (TD-005).
+- **Apply every migration to BOTH the primary database AND the lane database** (same principle as the
+  "both DBs" rule). Verify the next-free migration number against the migrations directory at build
+  time — don't trust doc numbering.
 
 ## Execution protocol
 1. **Implement the brief exactly as given** — API contract, data model, and behaviour it
@@ -43,6 +65,6 @@ kind — the eng-lead verifies your commit and publishes it.
 
 ## Hard rules
 - Implement the brief as written; deviations go in your summary, not silently into the code.
-- Migrations to both the primary and test databases if your stack uses migrations.
+- Migrations to BOTH the primary database AND the active lane database (TD-004/005).
 - Atomic commits, explicit filenames — never `git add .`. Never push. Never touch `web/**`.
 - Never call `github_flow.sh` yourself — fetch/claim/start/publish are the eng-lead's job.

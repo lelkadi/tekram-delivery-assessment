@@ -158,6 +158,7 @@ function emitOpencodeAgent(id, cfg, body, team) {
     ...(cfg.opencode_temperature != null ? { temperature: cfg.opencode_temperature } : {}),
     tools,
     permission: buildOpencodePermission(cfg, team),
+    ...(cfg.opencode_options || {}),
   };
   // Hand-built YAML strings don't scale to nested, glob-keyed permission trees (quoting "*" and
   // "**/apps/web/**" correctly by hand is error-prone) — dump via js-yaml instead.

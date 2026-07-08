@@ -14,7 +14,7 @@ priorities: [docs/00-project-management-plan.md](../docs/00-project-management-p
 | `pm-doc-intake` | claude-code / opus | Seeds the queue **from `docs/`** (plan + design docs): epics + typed work issues, labels, acceptance criteria. Runs at bootstrap and whenever a design doc adds scope. |
 | `pm-intake` | claude-code / opus | Turns **founder feedback** into atomic INVEST stories. Used in the feedback/testing round after the build exists. |
 | `researcher` | claude-code / sonnet | Reference gathering + first drafts of written deliverables. Posts one greppable "Research Notes" comment per issue. |
-| `architect-spec` | claude-code / opus | Part 1 architecture + diagrams, Part 3 schema, Part 2 spec (endpoints, layers, DTOs). Moves code issues `2-needs-spec → 3-ready-for-dev`. |
+| `architect-spec` | opencode / deepseek-v4-pro | Part 1 architecture + diagrams, Part 3 schema, Part 2 spec (endpoints, layers, DTOs). Moves code issues `2-needs-spec → 3-ready-for-dev`. |
 | `eng-lead` | opencode / deepseek-v4-pro | Orchestrates `type:code` issues: fetches, briefs engineers with self-contained tasks, verifies their local commits, publishes (push+PR+label), hands off to QA/architect-review. Never implements. |
 | `backend-engineer` | opencode / deepseek-v4-flash | Implements a eng-lead brief in `src/**` + `tests/**` (hard write scope). Commits locally; never pushes, never touches GitHub. |
 | `web-engineer` | opencode / deepseek-v4-flash | **P4 bonus only** — implements a eng-lead brief in `web/**`, spun up only after all P0–P3 deliverables exist. |

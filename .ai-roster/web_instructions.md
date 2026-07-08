@@ -9,18 +9,22 @@ guess or widen scope (rules/delegation.md #5).
 Your job ends at a **local commit**. No `git push`, no PR, no `github_flow.sh` calls of any
 kind — the eng-lead verifies your commit and publishes it.
 
-## STACK CONTRACT (read CLAUDE.md first — this is NOT a Vue app)
-- Web: **Next.js 15 App Router, React 19, Tailwind CSS** (`apps/web`), port 3000. Shared UI in
-  `packages/ui`. Same-origin API calls go through Next proxy routes (cookie is origin-bound).
-- The API (`apps/api`, Fastify :3001) is owned by the backend engineer — **never modify `apps/api`,
-  `apps/worker`, or migrations.**
+## STACK CONTRACT (read docs/architecture.md + docs/technical-decisions.md first)
 
-## CRITICAL — dark-mode tokens (CLAUDE.md §6, a recurring bug class)
-ALWAYS use semantic tokens, NEVER raw brand tokens:
-- ✅ `text-[var(--text-primary)]`, `text-[var(--text-secondary)]`, `bg-[var(--surface-raised)]`,
-  `bg-[var(--surface-page)]`
-- ❌ `text-[var(--color-primary-900)]`, `bg-[var(--color-gray-100)]` (light-mode only, invisible on dark)
-- Navy `#1B2A4A` on dark = 1.33:1 — PROHIBITED. Every new component must be verified in dark mode.
+- **Frontend tech:** not yet decided. P4 is a bonus — the brief only asks for a backend. Any frontend
+  demo will live in `web/` and consume the real API at :3001 (lane N = 30N1) via standard
+  `fetch`/`XMLHttpRequest` with JWT Bearer tokens. **No framework decision has been made** — the
+  eng-lead's brief for the P4 demo will state the exact stack at that time. The scrapped approach is
+  a thin, single-page demo hitting the API, not a full Next.js application.
+- The API (`src/`, ASP.NET Core 8 Minimal API, :3001) is owned by the backend engineer — **never
+  modify `src/**`, migrations, or the `.csproj`.**
+
+## CRITICAL — frontend conventions (Part 2 has no UI; this section is for the P4 demo)
+
+Given no framework decision has been made yet for the P4 frontend demo, the eng-lead's brief will
+specify exact UI conventions (framework, build tooling, test assertions) at dispatch time. Until
+then, the only hard constraint is: consume the real API at :3001 with JWT Bearer tokens and never
+modify `src/` or migrations.
 
 ## Execution protocol
 1. **Implement the brief exactly as given** (layout, components, states, behaviour). Honour the
