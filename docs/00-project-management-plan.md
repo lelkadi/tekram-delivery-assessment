@@ -19,8 +19,9 @@ Priorities are driven by (a) hard minimum thresholds, (b) point weight, (c) the 
 | **P2** | Part 8 — Documentation | 5 | — | Low points but "poor documentation" = auto concern → README/API docs/deploy guide must be genuinely good, produced alongside P0 work, polished at the end. |
 | **P2** | Part 7 — AI Strategy | 5 | — | Short proposal document. |
 | **P3** | Part 9 — Business Thinking | Bonus | — | "Poor business thinking" is an auto concern, so do a credible version — but only after P0–P2 are locked. |
+| **P4 (lowest)** | Frontend demo | Not in rubric | — | Not requested by the brief — Part 2 asks for a **backend** only. Zero rubric points, so it never displaces gated work. Kept as a nice-to-have differentiator: thin UI (login/register, browse restaurants, place an order) hitting the real API. Starts only after every P0–P3 deliverable exists; first thing dropped if time is short. |
 
-**Rule of thumb:** never let a P1–P3 task block a P0 task. The coding challenge gets the only true build/QA loop; everything else is a written deliverable with a review gate.
+**Rule of thumb:** never let a P1–P4 task block a P0 task. The coding challenge gets the only true build/QA loop; everything else is a written deliverable with a review gate.
 
 ## 2. Agent Team & Assignment
 
@@ -35,8 +36,9 @@ Roster lives in [.ai-roster/team.yaml](../.ai-roster/team.yaml); GitHub issues +
 | QA | claude-code / sonnet | Part 2 only: run the API for real, verify every endpoint + edge cases (invalid coupon, out-of-stock, bad JWT), check tests pass. |
 | PM — Verification | human-triggered (Loukan) | Your gate: score each part against the rubric before it's marked done. |
 | Architect — Review | claude-code / opus | Code review of Part 2; consistency review of Parts 1/3/5 (architecture ↔ schema ↔ DevOps must tell one story). |
+| Web Engineer (conditional, P4) | opencode / deepseek | Only spun up after P0–P3 are done: thin frontend demo against the Part 2 API. `write_scope` redefined to this repo's `web/**` (careeree's `apps/web/**` glob doesn't apply here); backend engineer's scope is `src/**` + `tests/**` so the two can't collide if both are active. |
 
-**Docs-heavy adaptation:** web-engineer and worker-engineer from the roster are **not used** (no frontend/worker in scope). For document-only issues the full 12-stage pipeline is collapsed to: `intake → draft (researcher/architect) → review (architect or PM) → done`. QA stage applies only to the coding challenge.
+**Docs-heavy adaptation:** worker-engineer from the roster is **not used** (no background-job scope in this assessment). For document-only issues the full 12-stage pipeline is collapsed to: `intake → draft (researcher/architect) → review (architect or PM) → done`. QA stage applies only to the coding challenge (and, if reached, the frontend demo).
 
 ## 3. Timeline (48h)
 
@@ -61,6 +63,7 @@ Roster lives in [.ai-roster/team.yaml](../.ai-roster/team.yaml); GitHub issues +
 | H30–H34 | **Part 7 AI Strategy** + **Part 9 Business Thinking** (24h actions + 30-day recovery plan). | Researcher → PM review |
 | H34–H40 | **Part 8 Documentation pass:** README, setup guide, API docs (OpenAPI/Swagger), deployment guide, env vars, folder structure, technical-decisions doc, future improvements. | Backend + Researcher |
 | H40–H45 | **Full review wave:** Architect review (code + cross-doc consistency) and PM audit scoring every part against the rubric. Fix highest-scoring-impact gaps first. | Architect, PM-Verify (you) |
+| H40–H45 (only if ahead of schedule) | **Frontend demo (P4, bonus)** — thin UI over the Part 2 API. Cut without hesitation if the review wave needs the time instead. | Web Engineer |
 | H45–H48 | Buffer. Final repo hygiene, links check, submission. **Ship at H48 regardless** — missing the deadline is an auto-fail. | You |
 
 ## 4. Deliverables Checklist
@@ -75,11 +78,12 @@ Roster lives in [.ai-roster/team.yaml](../.ai-roster/team.yaml); GitHub issues +
 - [ ] `docs/ai-strategy.md` (Part 7)
 - [ ] `README.md`, setup guide, API docs, deployment guide, `docs/technical-decisions.md` (Part 8)
 - [ ] `docs/business-recovery-plan.md` (Part 9, bonus)
+- [ ] Frontend demo (P4, bonus — not in rubric, only if time remains)
 
 ## 5. Issue Queue Conventions
 
 - One **epic issue per part** (`part-1` … `part-9` labels), sub-issues for Part 2 slices.
-- Labels: existing `status:*` set + `priority:P0|P1|P2|P3`.
+- Labels: existing `status:*` set + `priority:P0|P1|P2|P3|P4`.
 - Every issue body states: deliverable file path, rubric points, acceptance criteria, and the collapsed or full pipeline it follows.
 - Agents claim work via `github_flow.sh` exactly as in the roster; serialized lane (v1) is fine — only Part 2 needs the live stack.
 
