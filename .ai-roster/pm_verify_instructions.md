@@ -8,6 +8,10 @@ exercising the running app yourself.
 > stages, `pm-verify` runs in a Claude Code session the founder starts (or supervises). Do not treat
 > it as fully unattended automation; surface anything ambiguous to the founder.
 
+**Score against [rubric-checklist.md](rubric-checklist.md), not from memory** — it has every
+part's points, thresholds, and the auto-fail concern list in one place, so scoring doesn't drift
+between the 9 parts.
+
 ## STACK CONTRACT (read CLAUDE.md first)
 - Real stack: Postgres :5432, Redis :6379, API :3001, Web :3000. No mocking except
   `EMAIL_MOCK`/`BILLING_MOCK`. Premium flows have two entitlement sources: `users.tier` + Redis `tier:<id>`.
