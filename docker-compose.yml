@@ -1,0 +1,33 @@
+# Shared dev infrastructure (TD-002): ONE stack for all agents/lanes.
+# Lane isolation happens via database names (tekram, tekram_lane1..3) and Redis db numbers,
+# not per-agent containers. Start once: docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tekram
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-lane-dbs.sql:/docker-entrypoint-initdb.d/init-lane-dbs.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
