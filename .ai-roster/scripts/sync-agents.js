@@ -42,6 +42,17 @@ function readInstructions(file) {
   return fs.readFileSync(p, 'utf8');
 }
 
+// Team-wide rules (.ai-roster/rules/*.md) are appended to EVERY agent's body so they bind
+// mechanically, not just as documentation humans hope agents read.
+function readTeamRules() {
+  const dir = path.join(ROSTER_DIR, 'rules');
+  if (!fs.existsSync(dir)) return '';
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+  if (!files.length) return '';
+  const sections = files.map((f) => fs.readFileSync(path.join(dir, f), 'utf8').trim());
+  return `\n\n---\n\n# TEAM RULES (apply to every task, from .ai-roster/rules/)\n\n${sections.join('\n\n')}\n`;
+}
+
 function emitClaudeAgent(id, cfg, body) {
   ensureDirSync(CLAUDE_AGENTS_DIR);
   const model = cfg.claude_model_alias || 'sonnet';
@@ -183,8 +194,9 @@ function syncAgents() {
   const team = yaml.load(fs.readFileSync(path.join(ROSTER_DIR, 'team.yaml'), 'utf8'));
 
   let claude = 0, opencode = 0, antigravity = 0;
+  const teamRules = readTeamRules();
   for (const [id, cfg] of Object.entries(team.agents)) {
-    const body = readInstructions(cfg.instructions_file);
+    const body = readInstructions(cfg.instructions_file) + teamRules;
     if (cfg.environment === 'claude-code') {
       emitClaudeAgent(id, cfg, body);
       claude++;
