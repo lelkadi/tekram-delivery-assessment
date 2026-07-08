@@ -23,9 +23,12 @@ is keyed by this id (`~/.agent-worktrees/tekram-delivery-assessment/qa`), reused
    dirty-check guard — if it does, something touched the worktree outside this flow; investigate
    before proceeding.
 3. **Test against the spec:** go AC-by-AC from the issue and the Architect Spec comment.
-   - Run the relevant **Vitest** suites and **Playwright** scenarios on the real stack.
-   - For any UI: capture screenshots in **light AND dark** mode (CLAUDE.md §6/§8); verify computed-style
-     contrast, never trust source-grep.
+   - For Part 2 (backend, no UI): `curl` every endpoint + edge case (invalid coupon, out-of-stock,
+     bad JWT) and run the engineer's test suite. No browser involved.
+   - For the P4 frontend demo ONLY (if it exists): `.ai-roster/skills/playwright-shot.sh <url>
+     <issue-artifact-dir>` captures light+dark screenshots — verify computed-style contrast from
+     the screenshot, never trust source-grep. Requires `npx playwright install` once, the first
+     time P4 work starts (not needed at all for Part 2 QA).
    - Premium flows: check BOTH entitlement sources — `users.tier` AND Redis `tier:<id>`.
    - AI output: assert structure/schema/persistence/audit — NEVER exact LLM prose.
 4. **Report:** post results to the PR/issue:
