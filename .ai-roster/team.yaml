@@ -1,0 +1,146 @@
+# .ai-roster/team.yaml
+# SINGLE SOURCE OF TRUTH for the Careeree multi-agent, GitHub-issue-driven feedback workflow.
+# Sync to runtimes with:  node .ai-roster/scripts/sync-agents.js
+#   environment: claude-code  -> .claude/agents/<id>.md   (true subagents, fresh context)
+#   environment: opencode     -> .opencode/agents/<id>.md (markdown + YAML frontmatter)
+#   environment: antigravity  -> .agents/agents/<id>/agent.json
+#
+# NOTE (open decision #6): antigravity `model:` values are placeholders. Verify the real id
+# against Antigravity's live model menu before relying on the synced agent.json. A wrong id
+# fails silently at runtime. Search for TODO-VERIFY below.
+#
+# Claude Code `model:` frontmatter takes SHORT aliases (opus | sonnet | haiku), not the long
+# `claude-opus-4-8-thinking` strings. Use `claude_model_alias` for claude-code agents.
+#
+# opencode `model:` frontmatter takes a fully-qualified `provider/model-id` string (e.g.
+# `deepseek/deepseek-v4-flash`). Use `opencode_model` for opencode agents. The `deepseek`
+# provider itself is declared in `opencode.json` at the repo root (baseURL + model ids).
+#
+# `write_scope: [<globs>]` is a runtime-agnostic field: "this agent should only write inside these
+# globs." Enforcement level depends on what each runtime actually supports:
+#   - opencode:     HARD — permission.edit allows those globs, "ask" (interactive founder approval)
+#                    everywhere else; read/external_directory is allowed project-wide (including the
+#                    shared worktree root + /tmp below) so it never prompts for read permission.
+#   - claude-code:   SOFT — no per-agent path-glob permission exists in subagent frontmatter, so
+#                    this is written into the agent body as a documented rule, same guarantee class
+#                    as prose like "never touch apps/web" already in the instructions files.
+#                    Delegation is blocked by omitting Agent/Task from `tools:` (the default).
+#   - antigravity:   UNVERIFIED — carried through into agent.json as `write_scope_TODO_VERIFY` since
+#                    Antigravity's real permission schema was never confirmed (see decision #6).
+# See buildOpencodePermission()/emitClaudeAgent()/emitAntigravityAgent() in sync-agents.js.
+
+agents:
+  # ── Stage 0: intake ────────────────────────────────────────────────────────
+  pm-intake:
+    display_name: "PM — Intake"
+    stage: "0-intake -> 1-needs-research"
+    environment: "claude-code"
+    claude_model_alias: "opus"
+    tools: ["Read", "Grep", "Glob", "Bash", "WebSearch"]
+    instructions_file: "pm_intake_instructions.md"
+
+  # ── Stage 1: research ──────────────────────────────────────────────────────
+  researcher:
+    display_name: "Technical Researcher"
+    stage: "1-needs-research -> 2-needs-spec"
+    environment: "claude-code"
+    claude_model_alias: "sonnet"
+    tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
+    instructions_file: "researcher_instructions.md"
+
+  # ── Stage 2: spec ──────────────────────────────────────────────────────────
+  architect-spec:
+    display_name: "Architect — Spec"
+    stage: "2-needs-spec -> 3-ready-for-dev"
+    environment: "claude-code"
+    claude_model_alias: "opus"
+    tools: ["Read", "Grep", "Glob", "Bash"]
+    instructions_file: "architect_spec_instructions.md"
+
+  # ── Stage 3-4: engineers (parallel, worktrees) ─────────────────────────────
+  web-engineer:
+    display_name: "Web Engineer (apps/web)"
+    stage: "3-ready-for-dev -> 5-in-review"
+    environment: "opencode"
+    opencode_model: "deepseek/deepseek-v4-flash"
+    # Own write area (packages/ui is the shared-UI package the web engineer's instructions cite).
+    # Everything else falls to "ask" — opencode prompts the founder rather than silently allowing
+    # or hard-blocking a cross-directory edit.
+    write_scope: ["apps/web/**", "packages/ui/**"]
+    instructions_file: "web_instructions.md"
+    skills: ["github_flow"]
+
+  backend-engineer:
+    display_name: "Backend Engineer (apps/api)"
+    stage: "3-ready-for-dev -> 5-in-review"
+    environment: "opencode"
+    opencode_model: "deepseek/deepseek-v4-flash"
+    # packages/db (Drizzle) is explicitly backend-owned per backend_instructions.md.
+    write_scope: ["apps/api/**", "packages/db/**"]
+    instructions_file: "backend_instructions.md"
+    skills: ["github_flow"]
+
+  worker-engineer:
+    display_name: "Worker Engineer (apps/worker)"
+    stage: "3-ready-for-dev -> 5-in-review"
+    environment: "opencode"
+    opencode_model: "deepseek/deepseek-v4-flash"
+    # worker_instructions.md: worker shares DB/migration concerns with backend — both may touch
+    # packages/db, coordinating via the issue when a job needs a schema change.
+    write_scope: ["apps/worker/**", "packages/db/**"]
+    instructions_file: "worker_instructions.md"
+    skills: ["github_flow"]
+
+  # ── Stage 5: QA ────────────────────────────────────────────────────────────
+  qa:
+    display_name: "Browser QA & Tester"
+    stage: "5-in-review -> {6-qa-failed | 7-qa-passed}"
+    environment: "claude-code"
+    claude_model_alias: "sonnet"
+    tools: ["Read", "Grep", "Glob", "Bash"]
+    instructions_file: "qa_instructions.md"
+    skills: ["github_flow"]
+
+  # ── Stage 6: PM verification (HUMAN-TRIGGERED gate — decision #1) ───────────
+  pm-verify:
+    display_name: "PM — Verification"
+    stage: "7-qa-passed -> {8-pm-rejected | 9-pm-verified}"
+    environment: "claude-code"
+    claude_model_alias: "opus"
+    human_triggered: true   # founder / founder-supervised session runs this; NOT autonomous
+    tools: ["Read", "Grep", "Glob", "Bash"]
+    instructions_file: "pm_verify_instructions.md"
+
+  # ── Stage 7: Architect code review (accept/reject) ─────────────────────────
+  architect-review:
+    display_name: "Architect — Code Review"
+    stage: "9-pm-verified -> {10-arch-rejected | 11-done}"
+    environment: "claude-code"
+    claude_model_alias: "opus"
+    tools: ["Read", "Grep", "Glob", "Bash"]
+    instructions_file: "architect_review_instructions.md"
+
+# ── Workflow constants (consumed by github_flow.sh and human readers) ─────────
+workflow:
+  repo: "lelkadi/tekram-delivery-assessment"
+  branch_prefix: "issue-"
+  worktree_roots:
+    claude_code: "/Users/loukan/.agent-worktrees/tekram-delivery-assessment"
+    antigravity: "/Users/loukan/.gemini/antigravity/worktrees/careeree"
+  lane_lock_dir: "/Users/loukan/.agent-worktrees/.lanes"
+  concurrency: "serialized"      # decision #2: single global stack lock for v1 (lane:0 only)
+  circuit_breaker_strikes: 3     # decision #4
+  stale_sweep_days: 7            # decision #5
+  status_labels:
+    - "status:0-intake"
+    - "status:1-needs-research"
+    - "status:2-needs-spec"
+    - "status:3-ready-for-dev"
+    - "status:4-in-progress"
+    - "status:5-in-review"
+    - "status:6-qa-failed"
+    - "status:7-qa-passed"
+    - "status:8-pm-rejected"
+    - "status:9-pm-verified"
+    - "status:10-arch-rejected"
+    - "status:11-done"
