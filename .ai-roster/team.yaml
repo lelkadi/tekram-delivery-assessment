@@ -4,8 +4,11 @@
 # Sync to runtimes with:  node .ai-roster/scripts/sync-agents.js   (needs js-yaml, in package.json)
 #   environment: claude-code  -> .claude/agents/<id>.md   (true subagents, fresh context)
 #   environment: opencode     -> .opencode/agents/<id>.md (markdown + YAML frontmatter)
-# (careeree's third runtime, antigravity, was dropped from this roster: its model ids were
-#  never verified and fail silently — only the two verified runtimes above are used.)
+#   environment: antigravity  -> .agents/agents/<id>/agent.json  (Gemini — QA only, see below)
+# antigravity is used ONLY for the QA gate (Gemini, third-family independence). Its model ids and
+# permission schema were never verified and fail SILENTLY — see the QA block's ACCEPTED RISK note
+# and run the loud-failure spike before trusting it at the gate. All other roles use the two
+# verified runtimes above.
 #
 # Claude Code `model:` frontmatter takes SHORT aliases (opus | sonnet | haiku), not the long
 # `claude-opus-4-8-thinking` strings. Use `claude_model_alias` for claude-code agents.
@@ -125,23 +128,32 @@ agents:
     skills: ["github_flow"]
 
   # ── Stage 5: QA ────────────────────────────────────────────────────────────
-  # Deliberately claude-code/sonnet, NOT opencode/deepseek: QA reviewing a different model
-  # family than the one that wrote the code avoids correlated blind spots (the same model
-  # missing the same edge case it implemented). If ever moved to opencode, use v4-pro not
-  # -flash — QA runs once per submission (not a tight iterate loop), so accuracy at the gate
-  # outweighs the latency/cost saved by -flash.
-  # Gemini-via-antigravity was considered and rejected for the gate: the runtime was dropped
-  # from this roster because its model ids were never verified and fail SILENTLY — the worst
-  # possible failure mode for the QA gate specifically (a no-op QA looks like a pass). Model
-  # diversity vs the deepseek engineers is already achieved by claude QA. If Gemini is wanted,
-  # verify the antigravity runtime on a throwaway task first, then add it as an OPTIONAL second
-  # reviewer in the H40-45 review wave — never as the pipeline gate.
+  # DECISION (founder, overriding the earlier claude-sonnet default): QA runs on Gemini via
+  # antigravity — a THIRD model family, maximally decorrelated from both the deepseek engineers
+  # and the claude reviewers, for the most independent verification gate possible.
+  #
+  # ACCEPTED RISK + PREREQUISITE: antigravity is the one runtime in this roster whose model ids
+  # and permission/tool schema were never verified — a wrong id fails SILENTLY, which at a gate
+  # means a no-op QA looks identical to a pass. Before trusting this at the pipeline gate you MUST
+  # run the loud-failure spike: give it a deliberately bad id on a throwaway issue and confirm it
+  # ERRORS visibly (not empty-success), and confirm it can actually run bash (docker/curl/psql)
+  # and load the github_flow skill. Until that spike passes, treat QA verdicts as advisory and
+  # keep architect-review (claude) as the real gate.
+  #
+  # model: gemini-3.5-flash is the current STABLE Gemini Flash id per Google's canonical model
+  # docs (ai.google.dev/gemini-api/docs/models, retrieved 2026-07-08) — "most intelligent model
+  # for sustained frontier performance on agentic and coding tasks," the right profile for QA.
+  # `thinking: medium` encodes the "flash medium" tier. CAVEAT: this is the Gemini *API* id; that
+  # Antigravity's agent.json `model` field accepts this exact string (vs an Antigravity-specific
+  # menu alias) is the one thing still to confirm at first launch — if it errors, check
+  # Antigravity's live model menu for the exact label. This is part of the loud-failure spike
+  # above; do it before trusting QA verdicts at the gate.
   qa:
-    display_name: "Browser QA & Tester"
+    display_name: "Browser QA & Tester (Gemini via antigravity)"
     stage: "5-in-review -> {6-qa-failed | 7-qa-passed}"
-    environment: "claude-code"
-    claude_model_alias: "sonnet"
-    tools: ["Read", "Grep", "Glob", "Bash"]
+    environment: "antigravity"
+    model: "gemini-3.5-flash"
+    thinking: "medium"
     instructions_file: "qa_instructions.md"
     skills: ["github_flow"]
 
