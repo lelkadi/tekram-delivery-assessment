@@ -10,3 +10,9 @@ coverage/
 # local secrets — never commit
 .envrc
 .claude/settings.local.json
+
+.agents/
+.opencode/
+.claude/
+ORIGINAL_REQUEST.md
+CLAUDE.md
