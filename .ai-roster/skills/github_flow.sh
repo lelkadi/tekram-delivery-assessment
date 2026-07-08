@@ -229,6 +229,29 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     echo "Submitted #$n → status:5-in-review."
     ;;
 
+  publish)  # publish <issue> "<msg>" — LEAD-ORCHESTRATED FLOW ONLY: the engineer already committed
+            # locally (no push, no PR) so the lead can inspect the commit before it goes anywhere.
+            # This does the networked half of `submit` — push, open PR, status transition, claim +
+            # lane release — without touching staging/commit. Run in the ENGINEER's worktree
+            # (GH_AGENT_ID=<engineer-id>), after the lead has verified the local commit.
+    n="${1:?Usage: publish <issue> \"<msg>\"}"; shift
+    msg="${1:?summary message required}"
+    branch="issue-$n"
+    current="$(git branch --show-current)"
+    [ "$current" = "$branch" ] || { echo "Error: expected branch '$branch', on '$current'."; exit 1; }
+    ahead="$(git rev-list --count "origin/main..HEAD" 2>/dev/null || echo 0)"
+    [ "$ahead" -gt 0 ] || { echo "Error: no commits ahead of origin/main on '$branch' — nothing to publish."; exit 1; }
+    git push -u origin HEAD
+    gh pr create --repo "$REPO" --base main --head "$branch" \
+      --title "Issue #$n: $msg" --body "Implements #$n (Refs #$n). $msg" 2>/dev/null \
+      || echo "PR may already exist for $branch."
+    gh issue edit "$n" --repo "$REPO" --add-label "status:5-in-review" --remove-label "status:4-in-progress"
+    claim_label=$(gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep '^agent:claimed:' || true)
+    [ -n "$claim_label" ] && gh issue edit "$n" --repo "$REPO" --remove-label "$claim_label"
+    release_lane "$n"
+    echo "Published #$n → status:5-in-review."
+    ;;
+
   qa-comment)
     pr="${1:?Usage: qa-comment <pr> \"<message>\"}"; msg="${2:?message required}"
     gh pr comment "$pr" --repo "$REPO" --body "$msg"
@@ -277,6 +300,9 @@ Careeree GitHub Flow skill — commands:
                                             in QA's persistent worktree (force-reset each time)
   submit <issue> "<msg>" <file...>         stage EXPLICIT files, commit, push, open PR,
                                             → status:5-in-review, release lane
+  publish <issue> "<msg>"                  LEAD-ORCHESTRATED FLOW: push+PR+label only — assumes
+                                            the engineer already committed locally; lead runs this
+                                            after inspecting the commit (see tech_lead_instructions.md)
   qa-comment <pr> "<message>"              post QA report to a PR
   cleanup <issue>                          release lane + claim (on accept). Worktree persists.
   wipe                                     force-remove THIS agent's persistent worktree (manual
