@@ -1,0 +1,12 @@
+{
+  "name": "tekram-delivery-assessment",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tekram Technical Lead Assessment — workspace root (tooling deps only until the Part 2 scaffold lands)",
+  "scripts": {
+    "sync-agents": "node .ai-roster/scripts/sync-agents.js"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}
