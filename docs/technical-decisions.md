@@ -14,6 +14,7 @@ deliverable.
 | [TD-003](#td-003--collapsed-pipeline-for-document-deliverables) | Collapsed pipeline for doc deliverables | Accepted | — |
 | [TD-004](#td-004--net-8-aspnet-core-as-the-backend-stack) | .NET 8 / ASP.NET Core backend, Scalar for API docs | Accepted | — |
 | [TD-005](#td-005--postgres-schema-per-module-jsonb-snapshot-for-order-customizations) | Postgres schema-per-module; JSONB snapshot for order-time customizations | Accepted | Customization catalog outgrows a snapshot (e.g. loyalty-points-per-option) |
+| [TD-006](#td-006--qa-gate-on-gemini-via-antigravity-third-family-independence) | QA gate on Gemini (antigravity) for third-family independence | Accepted, **pending runtime spike** | Antigravity spike fails, or a verified equal-independence runtime appears |
 
 ---
 
@@ -175,3 +176,42 @@ field that is never queried across orders).
 (e.g. "how many Large pizzas sold this month" for merchant analytics/Loyalty), add a
 denormalized reporting column or materialized view rather than reversing the snapshot — reversing
 it would break the immutability guarantee this decision exists for.
+
+---
+
+## TD-006 — QA gate on Gemini via antigravity (third-family independence)
+
+**Status:** accepted, **pending runtime spike** (see prerequisite)
+**Date:** 2026-07-08
+
+**Context.** The QA gate protects the highest-weighted, hard-gated deliverable (Part 2 coding
+challenge, 25 pts, min 18). Its value is *independent* verification — catching what the
+implementer missed. Engineers run on deepseek; every other reviewer (eng-lead's own verify pass,
+architect-review) shares a family with either the engineers (deepseek) or the doc authors
+(claude).
+
+**Decision.** Run QA on **Gemini `gemini-3.5-flash` via the antigravity runtime** — a third
+model family, decorrelated from both deepseek and claude, for the most independent gate possible.
+`thinking: medium`. Model id is the current stable Gemini Flash per Google's canonical docs
+(ai.google.dev/gemini-api/docs/models, 2026-07-08), chosen for its "agentic and coding tasks"
+profile.
+
+**Accepted risk + hard prerequisite.** Antigravity is the one runtime in this roster whose model
+ids and tool/permission schema were never verified; a wrong id or broken tool bridge **fails
+silently**, and at a gate a silent no-op QA looks identical to a pass. Two things are unverified:
+(1) that antigravity's `agent.json` `model` field accepts the Gemini *API* id `gemini-3.5-flash`
+verbatim (vs an Antigravity-specific menu alias), and (2) that an antigravity agent can actually
+run bash (docker/curl/dotnet test) and load the `github_flow` skill. **Before trusting QA
+verdicts at the gate, run the loud-failure spike:** give it a deliberately wrong id on a throwaway
+issue and confirm it *errors visibly*; then confirm on a real issue that QA produced genuine
+output (curl/test results), not an empty verdict. Until the spike passes, treat QA verdicts as
+advisory and keep architect-review (claude) as the real gate. The eng-lead's handoff step already
+requires confirming QA actually ran before trusting the label it set.
+
+**Rejected alternatives.** Claude-sonnet QA (the prior default) — safe and already a different
+family from the deepseek engineers, but only *second*-family independence; kept as the documented
+fallback if the antigravity spike fails. DeepSeek QA — rejected outright: same family as the
+engineers, so correlated blind spots defeat the gate's purpose.
+
+**Revisit trigger.** The spike fails and can't be fixed quickly (→ fall back to claude-sonnet), or
+a runtime with equal independence and verified reliability becomes available.
