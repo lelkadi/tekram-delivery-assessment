@@ -122,7 +122,10 @@ function buildOpencodePermission(cfg, team) {
   // whether glob keys match relative or absolute paths, and worktrees have a different absolute
   // prefix than the main repo — so each scope pattern is registered both bare and `**/`-prefixed
   // to match under either anchoring.
-  if (cfg.write_scope && cfg.write_scope.length) {
+  // A DEFINED write_scope always emits the permission block — including an EMPTY one, which
+  // yields edit: {'*': 'ask'} with no allow globs (e.g. tech-lead: verify/dispatch only, every
+  // file edit needs founder approval). Only an absent write_scope leaves opencode defaults.
+  if (cfg.write_scope) {
     const edit = { '*': 'ask' };
     for (const pattern of cfg.write_scope) {
       edit[pattern] = 'allow';
