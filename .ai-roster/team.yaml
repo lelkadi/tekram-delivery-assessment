@@ -58,35 +58,35 @@ agents:
     instructions_file: "architect_spec_instructions.md"
 
   # ── Stage 3-4: engineers (parallel, worktrees) ─────────────────────────────
+  # Tekram layout (modular monolith, see docs/00-project-management-plan.md §6): backend code in
+  # src/ + tests/, optional P4 frontend demo in web/. Scopes are disjoint so both engineers can
+  # run concurrently without file conflicts.
   web-engineer:
-    display_name: "Web Engineer (apps/web)"
+    display_name: "Web Engineer (web/, P4 bonus only)"
     stage: "3-ready-for-dev -> 5-in-review"
     environment: "opencode"
     opencode_model: "deepseek/deepseek-v4-flash"
-    # Own write area (packages/ui is the shared-UI package the web engineer's instructions cite).
-    # Everything else falls to "ask" — opencode prompts the founder rather than silently allowing
-    # or hard-blocking a cross-directory edit.
-    write_scope: ["apps/web/**", "packages/ui/**"]
+    # Conditional role: only spun up for the P4 frontend demo after all P0-P3 deliverables exist.
+    write_scope: ["web/**"]
     instructions_file: "web_instructions.md"
     skills: ["github_flow"]
 
   backend-engineer:
-    display_name: "Backend Engineer (apps/api)"
+    display_name: "Backend Engineer (src/)"
     stage: "3-ready-for-dev -> 5-in-review"
     environment: "opencode"
     opencode_model: "deepseek/deepseek-v4-flash"
-    # packages/db (Drizzle) is explicitly backend-owned per backend_instructions.md.
-    write_scope: ["apps/api/**", "packages/db/**"]
+    write_scope: ["src/**", "tests/**"]
     instructions_file: "backend_instructions.md"
     skills: ["github_flow"]
 
+  # NOT USED in this assessment (no background-job scope) — kept for reference only; do not sync
+  # or spawn. write_scope still references careeree's layout.
   worker-engineer:
     display_name: "Worker Engineer (apps/worker)"
     stage: "3-ready-for-dev -> 5-in-review"
     environment: "opencode"
     opencode_model: "deepseek/deepseek-v4-flash"
-    # worker_instructions.md: worker shares DB/migration concerns with backend — both may touch
-    # packages/db, coordinating via the issue when a job needs a schema change.
     write_scope: ["apps/worker/**", "packages/db/**"]
     instructions_file: "worker_instructions.md"
     skills: ["github_flow"]
@@ -126,9 +126,11 @@ workflow:
   branch_prefix: "issue-"
   worktree_roots:
     claude_code: "/Users/loukan/.agent-worktrees/tekram-delivery-assessment"
-    antigravity: "/Users/loukan/.gemini/antigravity/worktrees/careeree"
+    antigravity: "/Users/loukan/.gemini/antigravity/worktrees/tekram-delivery-assessment"
   lane_lock_dir: "/Users/loukan/.agent-worktrees/.lanes"
-  concurrency: "serialized"      # decision #2: single global stack lock for v1 (lane:0 only)
+  concurrency: "parallel"        # MAX_LANES=3 (github_flow.sh default): per-lane ports + DB + Redis db.
+                                 # type:doc issues bypass lanes entirely — they never run the stack.
+                                 # Set MAX_LANES=1 to fall back to careeree's serialized v1 behavior.
   circuit_breaker_strikes: 3     # decision #4
   stale_sweep_days: 7            # decision #5
   status_labels:

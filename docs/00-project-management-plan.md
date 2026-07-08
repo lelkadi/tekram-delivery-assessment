@@ -82,12 +82,30 @@ Roster lives in [.ai-roster/team.yaml](../.ai-roster/team.yaml); GitHub issues +
 
 ## 5. Issue Queue Conventions
 
-- One **epic issue per part** (`part-1` … `part-9` labels), sub-issues for Part 2 slices.
-- Labels: existing `status:*` set + `priority:P0|P1|P2|P3|P4`.
+- One **epic issue per part** (`epic` + `part-1` … `part-9` labels), sub-issues for Part 2 slices linked from a task-list checklist in the epic body (each line `- [ ] #<n>` — GitHub renders progress automatically). Epics are tracking-only: agents never claim an issue labeled `epic`; they claim its sub-issues. Single-issue parts (most doc parts) get one issue with the `part-N` label and no `epic` label.
+- Labels: existing `status:*` set + `priority:P0|P1|P2|P3|P4` + `type:doc|type:code` (drives pipeline choice and lane usage — see §6).
 - Every issue body states: deliverable file path, rubric points, acceptance criteria, and the collapsed or full pipeline it follows.
-- Agents claim work via `github_flow.sh` exactly as in the roster; serialized lane (v1) is fine — only Part 2 needs the live stack.
+- Agents claim work via `github_flow.sh` exactly as in the roster, now with `MAX_LANES=3` parallel lanes (§6).
 
-## 6. Risks & Mitigations
+## 6. Parallel Execution Model
+
+The whole team runs concurrently; isolation happens at three layers, each already in the roster:
+
+| Layer | Mechanism | Where |
+|---|---|---|
+| Issue ownership | `agent:claimed:<id>` labels with read-back tiebreak | `github_flow.sh claim` |
+| Files | Per-agent persistent git worktrees (`~/.agent-worktrees/tekram-delivery-assessment/<agent-id>`); QA checks out engineers' pushed branches as read-only `qa-issue-<n>` aliases in its own worktree | `github_flow.sh start` / `qa-checkout` |
+| Runtime | **Lanes** (`MAX_LANES=3`): lane N gets its own API port (`30N1`), database (`tekram_laneN`), and Redis db (`N`) | `github_flow.sh` lane helpers |
+
+**Pipeline parallelism:** stages pipeline across issues — researcher drafts issue B while the architect specs issue A, the backend engineer builds slice 3 while QA tests slice 2 (engineer's `submit` releases its lane immediately; QA acquires its own). Doc and code issues run fully in parallel: `type:doc` issues never acquire a lane (they don't run the stack), so three doc agents can't starve QA.
+
+**Shared infrastructure (decided):** one `docker compose` stack on the host runs Postgres + Redis for everyone; lanes isolate via per-lane database names and Redis db numbers, **not** per-agent containers. Docker-per-agent is explicitly rejected for v1 (image builds + credential plumbing with no isolation gain over worktrees). Escalation path if lanes ever interfere: compose-project-per-lane (`docker compose -p laneN`), not needed day one.
+
+**Merge policy for parallel code work:** spec lands scaffold + shared types first; subsequent slices own disjoint directories (`src/auth/`, `src/restaurants/`, `src/orders/`); branches are short-lived, rebased on `main` before `submit`, merged promptly after review. Backend (`src/**`, `tests/**`) and web (`web/**`) write scopes are disjoint by construction.
+
+**Repo/service shape (working decision, architect ratifies in Part 1):** modular monolith in this single repo — one deployable API, module boundaries on the directory level as above. No microservices split and no per-module deploy pipelines for the challenge itself; the Part 1 architecture doc describes the extraction path (which modules become services first, and at what scale trigger). Rationale: at 15k orders/day a modular monolith is the defensible engineering answer, and it shows stronger judgment than premature microservices.
+
+## 7. Risks & Mitigations
 
 | Risk | Mitigation |
 |---|---|

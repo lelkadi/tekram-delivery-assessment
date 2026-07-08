@@ -13,7 +13,10 @@
 #   GH_AGENT_ID     agent role identity for claims/commits/worktree naming (default: eng-1 — set
 #                   this explicitly per role, see above)
 #   WORKTREE_ROOT   where per-agent worktrees live (default: ~/.agent-worktrees/tekram-delivery-assessment)
-#   MAX_LANES       concurrent live-stack lanes (default: 1 = serialized, per decision #2)
+#   MAX_LANES       concurrent live-stack lanes (default: 3 = parallel; set 1 to serialize).
+#                   Issues labeled type:doc never acquire a lane — they don't run the stack.
+#                   Postgres + Redis are one shared docker compose stack on the host; lanes get
+#                   isolation via per-lane database names / Redis db numbers, not per-lane containers.
 #
 # Conventions: repo lelkadi/tekram-delivery-assessment, branch issue-<n> (QA: qa-issue-<n>, see qa-checkout),
 # labels status:<n>-<slug> (colon, no space).
@@ -24,7 +27,7 @@ REPO="lelkadi/tekram-delivery-assessment"
 AGENT_ID="${GH_AGENT_ID:-eng-1}"
 WORKTREE_ROOT="${WORKTREE_ROOT:-$HOME/.agent-worktrees/tekram-delivery-assessment}"
 LANE_DIR="${LANE_DIR:-$HOME/.agent-worktrees/.lanes}"
-MAX_LANES="${MAX_LANES:-1}"
+MAX_LANES="${MAX_LANES:-3}"
 
 # ── guards ───────────────────────────────────────────────────────────────────
 command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not installed (brew update && brew install gh)"; exit 1; }
@@ -56,13 +59,17 @@ lane_env() {  # $1 = lane number → prints lane-scoped env
   local n="$1"
   if [ "$n" = "1" ] && [ "$MAX_LANES" = "1" ]; then
     echo "PORT=3001"; echo "WEB_PORT=3000"
-    echo "DATABASE_URL=postgres://localhost:5432/careeree"
+    echo "DATABASE_URL=postgres://localhost:5432/tekram"
     echo "REDIS_URL=redis://localhost:6379/0"
   else
     echo "PORT=30${n}1"; echo "WEB_PORT=30${n}0"
-    echo "DATABASE_URL=postgres://localhost:5432/careeree_lane${n}"
+    echo "DATABASE_URL=postgres://localhost:5432/tekram_lane${n}"
     echo "REDIS_URL=redis://localhost:6379/${n}"
   fi
+}
+
+is_doc_issue() {  # $1 = issue → 0 if labeled type:doc (no live stack, no lane needed)
+  gh issue view "$1" --repo "$REPO" --json labels -q '.labels[].name' | grep -q '^type:doc$'
 }
 
 # ── worktree helpers (per-agent persistent worktree, branch-switched per issue) ────────────────
@@ -135,10 +142,19 @@ case "$COMMAND" in
     echo "Claimed #$n as $AGENT_ID."
     ;;
 
-  start)  # start <issue> [lane] — checkout branch issue-<n> in THIS AGENT's persistent worktree
+  start)  # start <issue> [lane] — checkout branch issue-<n> in THIS AGENT's persistent worktree.
+          # type:doc issues skip lanes + .lane-env + install entirely: they never run the live
+          # stack, so they must not consume a lane that an engineer or QA needs.
     n="${1:?Usage: start <issue> [lane]}"
     branch="issue-$n"
     wt="$WORKTREE_ROOT/$AGENT_ID"
+    if is_doc_issue "$n"; then
+      git -C "$(git rev-parse --show-toplevel)" fetch origin --quiet
+      gh issue develop "$n" --repo "$REPO" --name "$branch" --base main >/dev/null 2>&1 || true
+      ensure_worktree_on_branch "$wt" "$branch" "$branch" "origin/main" || exit 1
+      echo "Ready (doc issue — no lane): branch '$branch' checked out in $AGENT_ID's worktree '$wt'. cd \"$wt\" to begin."
+      exit 0
+    fi
     lane="${2:-$(acquire_lane "$n")}"
     gh issue edit "$n" --repo "$REPO" --add-label "lane:$lane" >/dev/null 2>&1 || true
     git -C "$(git rev-parse --show-toplevel)" fetch origin --quiet

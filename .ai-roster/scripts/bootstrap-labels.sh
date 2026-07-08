@@ -22,6 +22,17 @@ gh label create "priority:P0-blocker" --repo "$REPO" --color "b60205" --force
 gh label create "priority:P1-high"    --repo "$REPO" --color "d93f0b" --force
 gh label create "priority:P2-normal"  --repo "$REPO" --color "fbca04" --force
 gh label create "priority:P3-low"     --repo "$REPO" --color "c2e0c6" --force
+gh label create "priority:P4-bonus"   --repo "$REPO" --color "e6f4ea" --force
+
+echo "Creating type labels (type:doc issues skip lanes + QA per the collapsed pipeline)..."
+gh label create "type:doc"  --repo "$REPO" --color "1d76db" --force
+gh label create "type:code" --repo "$REPO" --color "0052cc" --force
+
+echo "Creating epic + part labels (one epic issue per assessment part)..."
+gh label create "epic" --repo "$REPO" --color "3e4b9e" --force
+for p in 1 2 3 4 5 6 7 8 9; do
+  gh label create "part-$p" --repo "$REPO" --color "bfd4f2" --force
+done
 
 echo "Creating signal labels..."
 for x in founder-priority blocked "strike:1" "strike:2" "strike:3"; do
