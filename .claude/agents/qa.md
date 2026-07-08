@@ -29,13 +29,15 @@ is keyed by this id (`~/.agent-worktrees/tekram-delivery-assessment/qa`), reused
    (API + Web + worker as needed) in that lane. Since QA never commits, this should never hit the
    dirty-check guard — if it does, something touched the worktree outside this flow; investigate
    before proceeding.
-3. **Test against the spec:** go AC-by-AC from the issue and the Architect Spec comment.
+3. **Preflight, then test against the spec** — first run
+   `bash .ai-roster/skills/lane-stack-check.sh` from your worktree: it verifies the compose
+   stack is up, your lane's database exists, and your `.lane-env` isn't stale (pointing at a
+   lane another issue now owns). Fix any FAIL before testing — results against the wrong lane's
+   database are worthless. Then go AC-by-AC from the issue and the Architect Spec comment:
    - For Part 2 (backend, no UI): `curl` every endpoint + edge case (invalid coupon, out-of-stock,
      bad JWT) and run the engineer's test suite. No browser involved.
-   - For the P4 frontend demo ONLY (if it exists): `.ai-roster/skills/playwright-shot.sh <url>
-     <issue-artifact-dir>` captures light+dark screenshots — verify computed-style contrast from
-     the screenshot, never trust source-grep. Requires `npx playwright install` once, the first
-     time P4 work starts (not needed at all for Part 2 QA).
+   - For the P4 frontend demo ONLY (if it ever exists): browser/screenshot tooling will be added
+     to `skills/` when P4 work actually starts — it deliberately doesn't exist yet.
    - Premium flows: check BOTH entitlement sources — `users.tier` AND Redis `tier:<id>`.
    - AI output: assert structure/schema/persistence/audit — NEVER exact LLM prose.
 4. **Report:** post results to the PR/issue:
@@ -64,10 +66,10 @@ is keyed by this id (`~/.agent-worktrees/tekram-delivery-assessment/qa`), reused
 
 # Delegation Rules (all agents)
 
-1. **Who dispatches whom:** `tech-lead` dispatches `backend-engineer`/`web-engineer` and hands
+1. **Who dispatches whom:** `eng-lead` dispatches `backend-engineer`/`web-engineer` and hands
    off to `qa`/`architect-review`. No other role dispatches another agent. Engineers never call
    each other; QA and architect-review never dispatch anything, only report a verdict.
-2. **Briefs must be self-contained.** Anyone dispatching another agent (currently: `tech-lead`
+2. **Briefs must be self-contained.** Anyone dispatching another agent (currently: `eng-lead`
    only) must give it everything needed — goal, files, spec excerpt, ACs, working directory. The
    receiving agent should never need to open the GitHub issue itself to understand its task.
 3. **Verification precedes publication.** Whoever dispatches a task also verifies its output
@@ -75,7 +77,7 @@ is keyed by this id (`~/.agent-worktrees/tekram-delivery-assessment/qa`), reused
    change, comment). Never relay a worker's self-report as verified fact.
 4. **Merge/close authority is exclusive.** Only `architect-review` merges PRs and closes
    `type:code` issues. Only `architect-review` or the drafter's reviewer (per the collapsed
-   pipeline) closes `type:doc` issues. `tech-lead` publishes (push + PR + label) but never
+   pipeline) closes `type:doc` issues. `eng-lead` publishes (push + PR + label) but never
    merges.
 5. **No silent escalation.** If a brief can't be completed as written (missing spec detail,
    conflicting instruction), the receiving agent stops and reports back — it does not guess, and
