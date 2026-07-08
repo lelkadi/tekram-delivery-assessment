@@ -31,6 +31,22 @@ MAX_LANES="${MAX_LANES:-3}"
 
 # ── guards ───────────────────────────────────────────────────────────────────
 command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not installed (brew update && brew install gh)"; exit 1; }
+# Auto-source the repo-scoped PAT so agents never rely on the operator's global gh login
+# (which is scoped to a different repo). Works from worktrees too: --git-common-dir resolves
+# to the main repo's .git, where the untracked credential file lives.
+if [ -z "${GH_TOKEN:-}" ]; then
+  # host git is 2.23 — no --path-format=absolute; resolve relative --git-common-dir by hand
+  _common_git_dir="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  case "$_common_git_dir" in
+    "") ;;
+    /*) ;;
+    *) _common_git_dir="$(git rev-parse --show-toplevel 2>/dev/null)/$_common_git_dir" ;;
+  esac
+  if [ -n "$_common_git_dir" ] && [ -f "$_common_git_dir/credentials-tekram" ]; then
+    GH_TOKEN="$(sed -E 's#https://[^:]+:([^@]+)@.*#\1#' "$_common_git_dir/credentials-tekram")"
+    export GH_TOKEN
+  fi
+fi
 gh auth status >/dev/null 2>&1 || { echo "Error: gh not authenticated — run 'gh auth login' or export GH_TOKEN"; exit 1; }
 mkdir -p "$WORKTREE_ROOT" "$LANE_DIR"
 
@@ -59,11 +75,11 @@ lane_env() {  # $1 = lane number → prints lane-scoped env
   local n="$1"
   if [ "$n" = "1" ] && [ "$MAX_LANES" = "1" ]; then
     echo "PORT=3001"; echo "WEB_PORT=3000"
-    echo "DATABASE_URL=postgres://localhost:5432/tekram"
+    echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/tekram"
     echo "REDIS_URL=redis://localhost:6379/0"
   else
     echo "PORT=30${n}1"; echo "WEB_PORT=30${n}0"
-    echo "DATABASE_URL=postgres://localhost:5432/tekram_lane${n}"
+    echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/tekram_lane${n}"
     echo "REDIS_URL=redis://localhost:6379/${n}"
   fi
 }

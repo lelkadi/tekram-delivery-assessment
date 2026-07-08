@@ -6,3 +6,7 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+# local secrets — never commit
+.envrc
+.claude/settings.local.json
