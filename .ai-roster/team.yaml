@@ -26,6 +26,29 @@
 # See buildOpencodePermission()/emitClaudeAgent() in sync-agents.js.
 
 agents:
+  # ── Orchestration (priorities/gates only — no code, no dispatch) ────────────
+  pm-orchestrator:
+    display_name: "PM — Orchestrator (priorities & gates)"
+    stage: "cross-cutting: priority + gate ownership, not a pipeline stage"
+    environment: "claude-code"
+    claude_model_alias: "opus"
+    tools: ["Read", "Grep", "Glob", "Bash"]   # no Agent/Task — directs via priority/scope calls, doesn't spawn
+    instructions_file: "pm_orchestrator_instructions.md"
+
+  # ── Code-issue orchestrator (fetches, briefs, verifies, publishes; hands off to QA/architect) ──
+  # opencode, deepseek-v4-pro (not -flash): this role writes verification-grade briefs and
+  # independently re-checks engineer output — reasoning quality matters more than latency here,
+  # and it runs once per issue, not in a tight iterate-fast loop like an engineer.
+  tech-lead:
+    display_name: "Tech Lead (code-issue orchestrator)"
+    stage: "3-ready-for-dev -> 5-in-review (drives engineers; does not implement)"
+    environment: "opencode"
+    opencode_model: "deepseek/deepseek-v4-pro"
+    opencode_mode: "primary"
+    write_scope: []   # never edits src/**, web/**, or tests/** directly — dispatch + verify only
+    instructions_file: "tech_lead_instructions.md"
+    skills: ["github_flow"]
+
   # ── Stage 0: intake ────────────────────────────────────────────────────────
   # Two intake PMs with distinct sources:
   #   pm-doc-intake — seeds epics + work issues from docs/ (plan + design docs); used to
@@ -90,6 +113,11 @@ agents:
     skills: ["github_flow"]
 
   # ── Stage 5: QA ────────────────────────────────────────────────────────────
+  # Deliberately claude-code/sonnet, NOT opencode/deepseek: QA reviewing a different model
+  # family than the one that wrote the code avoids correlated blind spots (the same model
+  # missing the same edge case it implemented). If ever moved to opencode, use v4-pro not
+  # -flash — QA runs once per submission (not a tight iterate loop), so accuracy at the gate
+  # outweighs the latency/cost saved by -flash.
   qa:
     display_name: "Browser QA & Tester"
     stage: "5-in-review -> {6-qa-failed | 7-qa-passed}"
