@@ -15,9 +15,9 @@ priorities: [docs/00-project-management-plan.md](../docs/00-project-management-p
 | `pm-intake` | claude-code / opus | Turns **founder feedback** into atomic INVEST stories. Used in the feedback/testing round after the build exists. |
 | `researcher` | claude-code / sonnet | Reference gathering + first drafts of written deliverables. Posts one greppable "Research Notes" comment per issue. |
 | `architect-spec` | claude-code / opus | Part 1 architecture + diagrams, Part 3 schema, Part 2 spec (endpoints, layers, DTOs). Moves code issues `2-needs-spec → 3-ready-for-dev`. |
-| `tech-lead` | opencode / deepseek-v4-pro | Orchestrates `type:code` issues: fetches, briefs engineers with self-contained tasks, verifies their local commits, publishes (push+PR+label), hands off to QA/architect-review. Never implements. |
-| `backend-engineer` | opencode / deepseek-v4-flash | Implements a tech-lead brief in `src/**` + `tests/**` (hard write scope). Commits locally; never pushes, never touches GitHub. |
-| `web-engineer` | opencode / deepseek-v4-flash | **P4 bonus only** — implements a tech-lead brief in `web/**`, spun up only after all P0–P3 deliverables exist. |
+| `eng-lead` | opencode / deepseek-v4-pro | Orchestrates `type:code` issues: fetches, briefs engineers with self-contained tasks, verifies their local commits, publishes (push+PR+label), hands off to QA/architect-review. Never implements. |
+| `backend-engineer` | opencode / deepseek-v4-flash | Implements a eng-lead brief in `src/**` + `tests/**` (hard write scope). Commits locally; never pushes, never touches GitHub. |
+| `web-engineer` | opencode / deepseek-v4-flash | **P4 bonus only** — implements a eng-lead brief in `web/**`, spun up only after all P0–P3 deliverables exist. |
 | `qa` | claude-code / sonnet | Code issues only: checks out the PR branch read-only in its own worktree, runs the API + tests for real, verdict `6-qa-failed` / `7-qa-passed`. Deliberately a different model family than the engineers — reviewing your own implementer's blind spots with the same model is weaker than a second opinion. |
 | `pm-verify` | claude-code / opus, **human-triggered** | The founder's gate: scores deliverables against [rubric-checklist.md](rubric-checklist.md) → `8-pm-rejected` / `9-pm-verified`. |
 | `architect-review` | claude-code / opus | Final review. Code: correctness + spec conformance. Docs: cross-document consistency (architecture ↔ schema ↔ DevOps must tell one story). Only stage allowed to close issues → `11-done`, and the only one allowed to merge. |
@@ -50,34 +50,34 @@ Research and spec happen *inside* the draft step. Rework = review comment + move
 
 (`pm-doc-intake` seeds code issues at `2-needs-spec` since the design docs cover research.)
 
-## A work issue's life, step by step (code issue — tech-lead orchestrated)
+## A work issue's life, step by step (code issue — eng-lead orchestrated)
 
-Engineers never touch GitHub. `tech-lead` owns every `github_flow.sh` call on a code issue
-except the engineer's local commit itself; see [tech_lead_instructions.md](tech_lead_instructions.md)
+Engineers never touch GitHub. `eng-lead` owns every `github_flow.sh` call on a code issue
+except the engineer's local commit itself; see [eng_lead_instructions.md](eng_lead_instructions.md)
 and [rules/delegation.md](rules/delegation.md) for the full contract.
 
 1. `pm-doc-intake` creates the issue (labels: `part-N`, `priority:*`, `type:code`, status) with
    deliverable path, rubric points, and checkbox acceptance criteria; links it in its epic's
    task list (`- [ ] #n` — auto-checks on close).
 2. `architect-spec` posts the spec as one comment → `3-ready-for-dev`.
-3. `tech-lead`: `fetch` → `claim <n>` → prepares the engineer's worktree
+3. `eng-lead`: `fetch` → `claim <n>` → prepares the engineer's worktree
    (`GH_AGENT_ID=backend-engineer start <n>`) → compiles a self-contained brief (goal, files,
    spec excerpt, ACs, working directory) → dispatches (`opencode run --agent backend-engineer
    --cwd <worktree> "<brief>"`, or a `claude` CLI shell-out for a claude-code role).
 4. Engineer implements, tests, verifies live, `git commit`s locally, returns a summary. No push,
    no PR, no labels — that's steps 5-6.
-5. `tech-lead` independently re-verifies the commit (diff matches brief? tests pass? live
+5. `eng-lead` independently re-verifies the commit (diff matches brief? tests pass? live
    spot-check?). Fails → new brief to the same engineer, back to step 4. Passes → `publish <n>
    "<summary>"` (push, open PR, → `5-in-review`, release the lane), posting the engineer's
    summary as the handoff comment.
 6. `qa`: `qa-checkout <n>` (read-only alias branch, own worktree, own lane) → runs the stack
-   from `.lane-env` → verdict label + one `qa-comment` on the PR. Fail → back to `tech-lead`
+   from `.lane-env` → verdict label + one `qa-comment` on the PR. Fail → back to `eng-lead`
    step 3 with QA's repro.
 7. `pm-verify` (human-triggered) scores against [rubric-checklist.md](rubric-checklist.md).
-8. `architect-review` reviews and either rejects (back to `tech-lead`) or merges + closes →
+8. `architect-review` reviews and either rejects (back to `eng-lead`) or merges + closes →
    `11-done`, then `cleanup <n>`. Only role that merges or closes a code issue.
 
-Doc issues skip the tech-lead entirely and steps 6-7: drafter claims directly at step 3 (no
+Doc issues skip the eng-lead entirely and steps 6-7: drafter claims directly at step 3 (no
 lane), reviewer closes at step 8.
 
 ## Parallelism model (how everyone works at once without conflicts)
@@ -115,8 +115,10 @@ sometimes relevant, so it doesn't tax every other task:
   publish/qa-checkout/cleanup/lanes).
 - [skills/gh-env.sh](skills/gh-env.sh) — source this for a direct `gh` call outside
   `github_flow.sh`; derives `GH_TOKEN` from the untracked repo-local credential file.
-- [skills/playwright-shot.sh](skills/playwright-shot.sh) — light+dark screenshots. **P4 frontend
-  demo only** — Part 2 is a backend with no UI, so QA never needs this unless P4 is reached.
+- [skills/lane-stack-check.sh](skills/lane-stack-check.sh) — QA/engineer preflight: compose stack
+  up? lane database exists? `.lane-env` stale? Run from the worktree before any testing.
+  (Browser/screenshot tooling is deliberately absent until P4 frontend work actually starts —
+  Part 2 has no UI.)
 - [rubric-checklist.md](rubric-checklist.md) — every part's points/threshold/auto-fail concerns
   in one table; `pm-verify` scores against this instead of re-deriving the rubric from memory
   each time.
@@ -131,7 +133,7 @@ sometimes relevant, so it doesn't tax every other task:
   self-sourced by `github_flow.sh`/`gh-env.sh` from the untracked repo-local credential file, no
   env setup needed), `MAX_LANES` (default 3).
 - Cross-runtime handoffs (opencode ↔ claude-code) are always a CLI shell-out — there's no native
-  call between the two products. `tech-lead` (opencode) reaches `qa`/`architect-review`
+  call between the two products. `eng-lead` (opencode) reaches `qa`/`architect-review`
   (claude-code) via the `claude` CLI, and reaches engineers (opencode) via `opencode run`.
 
 ## Bootstrap order (H0–H2)
@@ -140,4 +142,4 @@ sometimes relevant, so it doesn't tax every other task:
 2. `REPO=lelkadi/tekram-delivery-assessment .ai-roster/scripts/bootstrap-labels.sh`
 3. `docker compose up -d` (Postgres + Redis, once the compose file lands with the scaffold)
 4. Run `pm-doc-intake` to seed epics + issues from `docs/`
-5. Start stage agents on their queues; `tech-lead` drives `type:code` issues end-to-end
+5. Start stage agents on their queues; `eng-lead` drives `type:code` issues end-to-end
