@@ -38,7 +38,7 @@ Roster lives in [.ai-roster/team.yaml](../.ai-roster/team.yaml); GitHub issues +
 | Architect — Review | claude-code / opus | Code review of Part 2; consistency review of Parts 1/3/5 (architecture ↔ schema ↔ DevOps must tell one story). |
 | Web Engineer (conditional, P4) | opencode / deepseek | Only spun up after P0–P3 are done: thin frontend demo against the Part 2 API. `write_scope` redefined to this repo's `web/**` (careeree's `apps/web/**` glob doesn't apply here); backend engineer's scope is `src/**` + `tests/**` so the two can't collide if both are active. |
 
-**Docs-heavy adaptation:** worker-engineer from the roster is **not used** (no background-job scope in this assessment). For document-only issues the full 12-stage pipeline is collapsed to: `intake → draft (researcher/architect) → review (architect or PM) → done`. QA stage applies only to the coding challenge (and, if reached, the frontend demo).
+**Docs-heavy adaptation:** careeree's worker-engineer was **removed from the roster** (no background-job scope in this assessment). For document-only issues the full 12-stage pipeline is collapsed to: `intake → draft (researcher/architect) → review (architect or PM) → done`. QA stage applies only to the coding challenge (and, if reached, the frontend demo). Full workflow documentation: [.ai-roster/README.md](../.ai-roster/README.md).
 
 ## 3. Timeline (48h)
 

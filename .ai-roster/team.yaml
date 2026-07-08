@@ -1,13 +1,11 @@
 # .ai-roster/team.yaml
-# SINGLE SOURCE OF TRUTH for the Careeree multi-agent, GitHub-issue-driven feedback workflow.
-# Sync to runtimes with:  node .ai-roster/scripts/sync-agents.js
+# SINGLE SOURCE OF TRUTH for the Tekram assessment multi-agent, GitHub-issue-driven workflow.
+# Full workflow documentation (roles, pipelines, steps): .ai-roster/README.md
+# Sync to runtimes with:  node .ai-roster/scripts/sync-agents.js   (needs js-yaml, in package.json)
 #   environment: claude-code  -> .claude/agents/<id>.md   (true subagents, fresh context)
 #   environment: opencode     -> .opencode/agents/<id>.md (markdown + YAML frontmatter)
-#   environment: antigravity  -> .agents/agents/<id>/agent.json
-#
-# NOTE (open decision #6): antigravity `model:` values are placeholders. Verify the real id
-# against Antigravity's live model menu before relying on the synced agent.json. A wrong id
-# fails silently at runtime. Search for TODO-VERIFY below.
+# (careeree's third runtime, antigravity, was dropped from this roster: its model ids were
+#  never verified and fail silently — only the two verified runtimes above are used.)
 #
 # Claude Code `model:` frontmatter takes SHORT aliases (opus | sonnet | haiku), not the long
 # `claude-opus-4-8-thinking` strings. Use `claude_model_alias` for claude-code agents.
@@ -23,16 +21,27 @@
 #                    shared worktree root + /tmp below) so it never prompts for read permission.
 #   - claude-code:   SOFT — no per-agent path-glob permission exists in subagent frontmatter, so
 #                    this is written into the agent body as a documented rule, same guarantee class
-#                    as prose like "never touch apps/web" already in the instructions files.
+#                    as prose rules already in the instructions files.
 #                    Delegation is blocked by omitting Agent/Task from `tools:` (the default).
-#   - antigravity:   UNVERIFIED — carried through into agent.json as `write_scope_TODO_VERIFY` since
-#                    Antigravity's real permission schema was never confirmed (see decision #6).
-# See buildOpencodePermission()/emitClaudeAgent()/emitAntigravityAgent() in sync-agents.js.
+# See buildOpencodePermission()/emitClaudeAgent() in sync-agents.js.
 
 agents:
   # ── Stage 0: intake ────────────────────────────────────────────────────────
+  # Two intake PMs with distinct sources:
+  #   pm-doc-intake — seeds epics + work issues from docs/ (plan + design docs); used to
+  #                   bootstrap the assessment queue and whenever a design doc adds scope.
+  #   pm-intake     — unchanged careeree-style founder-feedback intake; used later, in the
+  #                   feedback/testing round, when the founder reports issues against the build.
+  pm-doc-intake:
+    display_name: "PM — Doc Intake (plan-driven seeding)"
+    stage: "seeding: docs/ -> epics + typed work issues"
+    environment: "claude-code"
+    claude_model_alias: "opus"
+    tools: ["Read", "Grep", "Glob", "Bash"]
+    instructions_file: "pm_doc_intake_instructions.md"
+
   pm-intake:
-    display_name: "PM — Intake"
+    display_name: "PM — Intake (founder feedback)"
     stage: "0-intake -> 1-needs-research"
     environment: "claude-code"
     claude_model_alias: "opus"
@@ -80,17 +89,6 @@ agents:
     instructions_file: "backend_instructions.md"
     skills: ["github_flow"]
 
-  # NOT USED in this assessment (no background-job scope) — kept for reference only; do not sync
-  # or spawn. write_scope still references careeree's layout.
-  worker-engineer:
-    display_name: "Worker Engineer (apps/worker)"
-    stage: "3-ready-for-dev -> 5-in-review"
-    environment: "opencode"
-    opencode_model: "deepseek/deepseek-v4-flash"
-    write_scope: ["apps/worker/**", "packages/db/**"]
-    instructions_file: "worker_instructions.md"
-    skills: ["github_flow"]
-
   # ── Stage 5: QA ────────────────────────────────────────────────────────────
   qa:
     display_name: "Browser QA & Tester"
@@ -126,7 +124,6 @@ workflow:
   branch_prefix: "issue-"
   worktree_roots:
     claude_code: "/Users/loukan/.agent-worktrees/tekram-delivery-assessment"
-    antigravity: "/Users/loukan/.gemini/antigravity/worktrees/tekram-delivery-assessment"
   lane_lock_dir: "/Users/loukan/.agent-worktrees/.lanes"
   concurrency: "parallel"        # MAX_LANES=3 (github_flow.sh default): per-lane ports + DB + Redis db.
                                  # type:doc issues bypass lanes entirely — they never run the stack.
