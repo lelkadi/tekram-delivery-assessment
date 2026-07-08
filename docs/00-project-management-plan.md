@@ -33,16 +33,16 @@ Roster lives in [.ai-roster/team.yaml](../.ai-roster/team.yaml); GitHub issues +
 | PM — Doc Intake | claude-code / opus | Seeds epics + typed work issues from this plan and the design docs, keeps priorities honest. |
 | Researcher | claude-code / sonnet | Reference gathering for Architecture, DevOps, Debugging, AI parts; first drafts of written parts. |
 | Architect — Spec | claude-code / opus | Part 1 architecture + diagrams, Part 3 schema, coding-challenge spec (endpoints, layers, DTOs). |
-| Tech Lead | opencode / deepseek-v4-pro | Orchestrates every code issue: fetches, briefs the engineer with a self-contained task, verifies the local commit independently, publishes (push+PR+label), hands off to QA/Architect-review. Never implements — see [.ai-roster/tech_lead_instructions.md](../.ai-roster/tech_lead_instructions.md). |
-| Backend Engineer | opencode / deepseek-v4-flash | Implements the tech lead's brief only: JWT auth, restaurants list/search/pagination, order creation (stock, delivery fee, coupons), unit tests. Commits locally; never touches GitHub. |
+| Engineering Lead | opencode / deepseek-v4-pro | Orchestrates every code issue: fetches, briefs the engineer with a self-contained task, verifies the local commit independently, publishes (push+PR+label), hands off to QA/Architect-review. Never implements — see [.ai-roster/eng_lead_instructions.md](../.ai-roster/eng_lead_instructions.md). |
+| Backend Engineer | opencode / deepseek-v4-flash | Implements the engineering lead's brief only: JWT auth, restaurants list/search/pagination, order creation (stock, delivery fee, coupons), unit tests. Commits locally; never touches GitHub. |
 | QA | claude-code / sonnet | Part 2 only: run the API for real, verify every endpoint + edge cases (invalid coupon, out-of-stock, bad JWT), check tests pass. Deliberately a different model family than the engineer, to avoid correlated blind spots. |
 | PM — Verification | human-triggered (Loukan) | Your gate: score each part against [.ai-roster/rubric-checklist.md](../.ai-roster/rubric-checklist.md) before it's marked done. |
 | Architect — Review | claude-code / opus | Code review of Part 2; consistency review of Parts 1/3/5 (architecture ↔ schema ↔ DevOps must tell one story). Only role that merges or closes a code issue. |
-| Web Engineer (conditional, P4) | opencode / deepseek-v4-flash | Only spun up after P0–P3 are done: thin frontend demo against the Part 2 API, briefed by the tech lead exactly like the backend engineer. `write_scope` is this repo's `web/**` (careeree's `apps/web/**` glob doesn't apply here); backend engineer's scope is `src/**` + `tests/**` so the two can't collide if both are active. |
+| Web Engineer (conditional, P4) | opencode / deepseek-v4-flash | Only spun up after P0–P3 are done: thin frontend demo against the Part 2 API, briefed by the engineering lead exactly like the backend engineer. `write_scope` is this repo's `web/**` (careeree's `apps/web/**` glob doesn't apply here); backend engineer's scope is `src/**` + `tests/**` so the two can't collide if both are active. |
 
-**Delegation model:** engineers never touch GitHub — the tech lead owns every `github_flow.sh`
+**Delegation model:** engineers never touch GitHub — the engineering lead owns every `github_flow.sh`
 call on a code issue except the engineer's own local `git commit`. Cross-runtime handoffs
-(opencode tech-lead ↔ claude-code QA/architect-review) are CLI shell-outs; there's no native
+(opencode eng-lead ↔ claude-code QA/architect-review) are CLI shell-outs; there's no native
 call between the two products. Full contract: [.ai-roster/rules/delegation.md](../.ai-roster/rules/delegation.md).
 
 **Docs-heavy adaptation:** careeree's worker-engineer was **removed from the roster** (no background-job scope in this assessment). For document-only issues the full 12-stage pipeline is collapsed to: `intake → draft (researcher/architect) → review (architect or PM) → done`. QA stage applies only to the coding challenge (and, if reached, the frontend demo). Full workflow documentation: [.ai-roster/README.md](../.ai-roster/README.md).

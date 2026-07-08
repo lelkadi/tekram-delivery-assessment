@@ -302,7 +302,8 @@ Careeree GitHub Flow skill — commands:
                                             → status:5-in-review, release lane
   publish <issue> "<msg>"                  LEAD-ORCHESTRATED FLOW: push+PR+label only — assumes
                                             the engineer already committed locally; lead runs this
-                                            after inspecting the commit (see tech_lead_instructions.md)
+                                            FROM INSIDE the engineer's worktree after inspecting
+                                            the commit (see eng_lead_instructions.md)
   qa-comment <pr> "<message>"              post QA report to a PR
   cleanup <issue>                          release lane + claim (on accept). Worktree persists.
   wipe                                     force-remove THIS agent's persistent worktree (manual
