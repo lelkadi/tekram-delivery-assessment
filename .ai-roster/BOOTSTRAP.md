@@ -90,8 +90,9 @@ User Story" when running `gh issue create --repo lelkadi/tekram-delivery-assessm
 node .ai-roster/scripts/sync-agents.js
 ```
 Confirm:
-- `.claude/agents/*.md` created (7 files), each with valid frontmatter (`name`, `description`, `tools`, `model`).
-- `.agents/agents/*/agent.json` created for Antigravity roles (if that runtime's model ids are verified — the roster has deprecated unverified Antigravity model references).
+- `.claude/agents/*.md` created (7 files), each with valid frontmatter (`name`, `description`, `tools`, `model`; `qa` additionally carries `effort: high` — TD-007).
+- `.opencode/agents/*.md` created (4 files).
+- NO Antigravity output — that runtime is retired (QA moved to claude-code, TD-007). If a stale `.agents/agents/qa/` survives from an earlier sync, delete it so a stale Gemini QA definition can't be picked up.
 
 ## 9. Branch protection on `main` (recommended before agents start opening PRs)
 ```bash

@@ -76,11 +76,14 @@ function emitClaudeAgent(id, cfg, body) {
   const scopeNote = (cfg.write_scope && cfg.write_scope.length)
     ? `\n## Write scope (repo convention, not tool-enforced on this runtime)\nOnly edit files under: ${cfg.write_scope.join(', ')}. Ask before touching anything else.\n`
     : '';
+  // `effort:` (low|medium|high|xhigh|max) overrides the session effort level for this subagent;
+  // thinking depth follows effort on this runtime, so there is no separate thinking field.
+  const effort = cfg.claude_effort ? `effort: ${cfg.claude_effort}\n` : '';
   const frontmatter =
-    `---\nname: ${id}\ndescription: ${JSON.stringify(desc)}\ntools: ${tools}\nmodel: ${model}\n---\n\n`;
+    `---\nname: ${id}\ndescription: ${JSON.stringify(desc)}\ntools: ${tools}\nmodel: ${model}\n${effort}---\n\n`;
   const out = path.join(CLAUDE_AGENTS_DIR, `${id}.md`);
   fs.writeFileSync(out, frontmatter + body + scopeNote);
-  console.log(`[Claude Code] ${cfg.display_name} -> .claude/agents/${id}.md (model: ${model})`);
+  console.log(`[Claude Code] ${cfg.display_name} -> .claude/agents/${id}.md (model: ${model}${cfg.claude_effort ? `, effort: ${cfg.claude_effort}` : ''})`);
 }
 
 // emitClaudeCommand removed — Claude Code auto-generates agent-invoking skills directly

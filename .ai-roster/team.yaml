@@ -4,14 +4,14 @@
 # Sync to runtimes with:  node .ai-roster/scripts/sync-agents.js   (needs js-yaml, in package.json)
 #   environment: claude-code  -> .claude/agents/<id>.md   (true subagents, fresh context)
 #   environment: opencode     -> .opencode/agents/<id>.md (markdown + YAML frontmatter)
-#   environment: antigravity  -> .agents/agents/<id>/agent.json  (Gemini — QA only, see below)
-# antigravity is used ONLY for the QA gate (Gemini, third-family independence). Its model ids and
-# permission schema were never verified and fail SILENTLY — see the QA block's ACCEPTED RISK note
-# and run the loud-failure spike before trusting it at the gate. All other roles use the two
-# verified runtimes above.
+#   environment: antigravity  -> .agents/agents/<id>/agent.json  (RETIRED — no roles use it since
+#     QA moved to claude-code on 2026-07-09, TD-007; emitter kept in sync-agents.js in case a
+#     role ever returns to that runtime, but its model ids/permission schema remain UNVERIFIED)
 #
 # Claude Code `model:` frontmatter takes SHORT aliases (opus | sonnet | haiku), not the long
 # `claude-opus-4-8-thinking` strings. Use `claude_model_alias` for claude-code agents.
+# `claude_effort` maps to the frontmatter `effort:` field (low|medium|high|xhigh|max) — on this
+# runtime thinking depth follows effort, so there is no separate thinking knob.
 #
 # opencode `model:` frontmatter takes a fully-qualified `provider/model-id` string (e.g.
 # `deepseek/deepseek-v4-flash`). Use `opencode_model` for opencode agents. The `deepseek`
@@ -128,32 +128,27 @@ agents:
     skills: ["github_flow"]
 
   # ── Stage 5: QA ────────────────────────────────────────────────────────────
-  # DECISION (founder, overriding the earlier claude-sonnet default): QA runs on Gemini via
-  # antigravity — a THIRD model family, maximally decorrelated from both the deepseek engineers
-  # and the claude reviewers, for the most independent verification gate possible.
+  # DECISION (founder, 2026-07-09, supersedes the 2026-07-08 Gemini/antigravity choice — TD-007):
+  # QA runs on claude-code / sonnet at HIGH effort (thinking depth follows effort on this
+  # runtime; there is no separate thinking knob). This exercises TD-006's own revisit trigger and
+  # documented fallback: the loud-failure spike was never run, and a verified, loud-failure
+  # runtime beats third-family independence on an unverified one — a silent no-op gate is worse
+  # than a correlated gate. sonnet (not opus) keeps QA off the exact model that reviews it
+  # (architect-review / pm-verify are opus).
   #
-  # ACCEPTED RISK + PREREQUISITE: antigravity is the one runtime in this roster whose model ids
-  # and permission/tool schema were never verified — a wrong id fails SILENTLY, which at a gate
-  # means a no-op QA looks identical to a pass. Before trusting this at the pipeline gate you MUST
-  # run the loud-failure spike: give it a deliberately bad id on a throwaway issue and confirm it
-  # ERRORS visibly (not empty-success), and confirm it can actually run bash (docker/curl/psql)
-  # and load the github_flow skill. Until that spike passes, treat QA verdicts as advisory and
-  # keep architect-review (claude) as the real gate.
-  #
-  # model: gemini-3.5-flash is the current STABLE Gemini Flash id per Google's canonical model
-  # docs (ai.google.dev/gemini-api/docs/models, retrieved 2026-07-08) — "most intelligent model
-  # for sustained frontier performance on agentic and coding tasks," the right profile for QA.
-  # `thinking: medium` encodes the "flash medium" tier. CAVEAT: this is the Gemini *API* id; that
-  # Antigravity's agent.json `model` field accepts this exact string (vs an Antigravity-specific
-  # menu alias) is the one thing still to confirm at first launch — if it errors, check
-  # Antigravity's live model menu for the exact label. This is part of the loud-failure spike
-  # above; do it before trusting QA verdicts at the gate.
+  # Gate independence now comes from METHOD, not model family (TD-008): QA persists a black-box
+  # e2e suite per issue — one xUnit fact per acceptance criterion under tests/e2e/ — and verdicts
+  # on its red/green, which is machine-checkable evidence that doesn't share a same-family
+  # reviewer's blind spots. tests/e2e/** is QA's ONLY write area (prose-enforced on this runtime;
+  # see sync-agents.js scopeNote).
   qa:
-    display_name: "Browser QA & Tester (Gemini via antigravity)"
+    display_name: "QA & Tester (e2e per AC)"
     stage: "5-in-review -> {6-qa-failed | 7-qa-passed}"
-    environment: "antigravity"
-    model: "gemini-3.5-flash"
-    thinking: "medium"
+    environment: "claude-code"
+    claude_model_alias: "sonnet"
+    claude_effort: "high"
+    tools: ["Read", "Grep", "Glob", "Bash", "Write", "Edit"]
+    write_scope: ["tests/e2e/**"]
     instructions_file: "qa_instructions.md"
     skills: ["github_flow"]
 

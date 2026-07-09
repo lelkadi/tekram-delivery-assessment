@@ -52,7 +52,10 @@ kind — the eng-lead verifies your commit and publishes it.
    rejection — never silently substitute your own judgment for the spec.
 2. **Test:** write real tests against the real stack (the lane's `.lane-env` gives you the
    ports/DB/Redis URLs for this run). Assert structure/schema/persistence — never exact prose for
-   any LLM-touching output.
+   any LLM-touching output. `tests/e2e/**` is QA-owned (TD-008): never edit it. On a QA rejection,
+   QA's red e2e facts on your branch are the acceptance bar — your fix must turn them green
+   (`E2E_BASE_URL=http://localhost:$PORT dotnet test tests/e2e`), and their commit must survive
+   any amend/rebase (rules/git.md #5).
 3. **Verify live yourself:** `curl` the new endpoint and query the resulting rows; put the REAL
    output in your summary, never an assumption from source alone.
 4. **Commit:** `git add -- <exact files>` (never `git add .`/`-A`, rules/git.md), `git commit`

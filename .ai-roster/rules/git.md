@@ -11,7 +11,11 @@
 4. **Branches.** One issue = one branch (`issue-<n>`), short-lived, created off `main` via
    `github_flow.sh start`. Rebase on `main` before `submit`; merge promptly after review.
 5. **No force-push** on shared branches. Exception: an engineer amending their own unmerged
-   `issue-<n>` after QA rejection (QA's `qa-checkout` force-resets its read-only alias to match).
+   `issue-<n>` after QA rejection (QA's `qa-checkout` force-resets its alias to match) — but any
+   `test(e2e)` commit QA pushed onto the branch must SURVIVE the amend: rebase your fix on top
+   of it (or cherry-pick it back) and push with `--force-with-lease`. Deleting or weakening a QA
+   e2e test to get green is a gate violation — if a test contradicts the spec, say so on the
+   issue instead.
 6. **Never commit secrets** — tokens, `.env` files, credential files. `.env*` is gitignored;
    if a secret lands in a commit anyway, stop and tell the founder immediately (rotation needed),
    don't just delete the file in a follow-up commit.

@@ -14,7 +14,9 @@ deliverable.
 | [TD-003](#td-003--collapsed-pipeline-for-document-deliverables) | Collapsed pipeline for doc deliverables | Accepted | — |
 | [TD-004](#td-004--net-8-aspnet-core-as-the-backend-stack) | .NET 8 / ASP.NET Core backend, Scalar for API docs | Accepted | — |
 | [TD-005](#td-005--postgres-schema-per-module-jsonb-snapshot-for-order-customizations) | Postgres schema-per-module; JSONB snapshot for order-time customizations | Accepted | Customization catalog outgrows a snapshot (e.g. loyalty-points-per-option) |
-| [TD-006](#td-006--qa-gate-on-gemini-via-antigravity-third-family-independence) | QA gate on Gemini (antigravity) for third-family independence | Accepted, **pending runtime spike** | Antigravity spike fails, or a verified equal-independence runtime appears |
+| [TD-006](#td-006--qa-gate-on-gemini-via-antigravity-third-family-independence) | QA gate on Gemini (antigravity) for third-family independence | **Superseded by TD-007** (2026-07-09) | — |
+| [TD-007](#td-007--qa-gate-on-claude-code--sonnet-high-effort-supersedes-td-006) | QA gate on claude-code / sonnet, high effort | Accepted | Verified third-family runtime appears with slack to migrate, or correlated QA/architect misses observed |
+| [TD-008](#td-008--qa-persists-a-black-box-e2e-suite-per-issue-one-fact-per-ac) | QA persists a black-box e2e suite per issue (one fact per AC) | Accepted | Suite runtime slows the gate materially, or P4 UI needs true browser e2e |
 
 ---
 
@@ -181,7 +183,7 @@ it would break the immutability guarantee this decision exists for.
 
 ## TD-006 — QA gate on Gemini via antigravity (third-family independence)
 
-**Status:** accepted, **pending runtime spike** (see prerequisite)
+**Status:** SUPERSEDED by [TD-007](#td-007--qa-gate-on-claude-code--sonnet-high-effort-supersedes-td-006) (2026-07-09) — the revisit trigger below was exercised: the runtime spike was never run and the deadline left no room to verify a silent-failure runtime at the gate.
 **Date:** 2026-07-08
 
 **Context.** The QA gate protects the highest-weighted, hard-gated deliverable (Part 2 coding
@@ -215,3 +217,56 @@ engineers, so correlated blind spots defeat the gate's purpose.
 
 **Revisit trigger.** The spike fails and can't be fixed quickly (→ fall back to claude-sonnet), or
 a runtime with equal independence and verified reliability becomes available.
+
+## TD-007 — QA gate on claude-code / sonnet, high effort (supersedes TD-006)
+
+**Status:** accepted
+**Date:** 2026-07-09
+
+**Context.** TD-006 put QA on Gemini via antigravity for third-family independence, hard-gated on
+a loud-failure spike that was never run. The deadline is 2026-07-10; the spike is unbudgeted work,
+and an unverified silent-failure runtime at the gate is the worst available failure mode — a no-op
+QA that looks identical to a pass.
+
+**Decision.** Exercise TD-006's own revisit trigger and documented fallback: QA runs on
+**claude-code / sonnet** with `effort: high` (on this runtime thinking depth follows effort; there
+is no separate thinking knob). Sonnet rather than opus keeps QA off the exact model that performs
+architect-review and pm-verify.
+
+**Trade accepted.** Second-family independence (claude vs the deepseek engineers) instead of
+third-family, and QA now shares a family with the downstream reviewers. Mitigated by TD-008: the
+gate's independence shifts from model family to *method* — the verdict rests on persistent,
+machine-checkable e2e tests derived from acceptance criteria, and a test's red/green does not
+share a same-family reviewer's blind spots.
+
+**Rejected alternatives.** Running the antigravity spike first (unbudgeted against the deadline;
+fallback was pre-approved in TD-006). Opus QA (maximum capability, but zero decorrelation from the
+reviewing gates). DeepSeek QA (same family as the engineers — rejected in TD-006, still rejected).
+
+**Revisit trigger.** A verified third-family runtime with loud failures becomes available AND
+there is slack to migrate; or evidence of correlated misses between QA and architect-review.
+
+## TD-008 — QA persists a black-box e2e suite per issue (one fact per AC)
+
+**Status:** accepted
+**Date:** 2026-07-09
+
+**Context.** QA's verification was ephemeral — curl transcripts in a PR comment: evidence that
+evaporates after the verdict, re-verifies nothing on later regressions, and (after TD-007 put QA
+in the reviewers' model family) carries no independent weight of its own.
+
+**Decision.** For every code issue it reviews, QA writes `tests/e2e/Issue<N>Tests.cs`: one xUnit
+fact per acceptance criterion, black-box `HttpClient` against the running lane API — no project
+reference to `src/**`, no `WebApplicationFactory` (deliberately decorrelated from the engineers'
+in-process integration tests) — env-gated by `E2E_BASE_URL` (facts skip when unset, so a bare
+`dotnet test` in CI without a live stack stays green). The suite is committed atomically
+(`test(e2e): AC coverage for #<n>`) and pushed onto the PR branch **PASS or FAIL** — red facts are
+the rejection's machine-checkable repro, and the engineer's fix must turn them green.
+`tests/e2e/**` is QA's only write scope; engineers must never edit or weaken it (rules/git.md #5).
+
+**Consequences.** QA is no longer strictly read-only (write scope carved to `tests/e2e/**`). The
+accumulated suite doubles as a regression harness for later issues. The eng-lead's "did QA
+actually run" check becomes mechanical: a `test(e2e)` commit must exist on the branch.
+
+**Revisit trigger.** Suite runtime slows the gate materially (→ split into a nightly run), or P4
+UI work needs true browser e2e (→ extend the location/convention, not this decision).

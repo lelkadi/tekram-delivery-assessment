@@ -71,17 +71,16 @@ CLI-shell-out to Claude Code as a workaround; it's the mechanism.
    claim and the lane (freeing it for the next dispatch). Post the engineer's summary (lightly
    edited for clarity, not rewritten) as the handoff comment — this is the audit trail; don't
    let it live only in your own context.
-8. **Hand off to QA** (Gemini via **antigravity**, cross-runtime shell-out). Brief is the same —
-   "Review PR for issue #<n> on branch issue-<n>. Run: `GH_AGENT_ID=qa bash
-   .ai-roster/skills/github_flow.sh qa-checkout <n>`, then follow qa_instructions.md." — but the
-   invocation is antigravity's CLI, not `claude`. **The exact antigravity invocation is
-   UNVERIFIED** (same TODO-VERIFY caveat as its model id); confirm it on a throwaway task first,
-   and confirm QA actually ran (real curl/psql/test output, not an empty verdict) before you
-   trust the label it set — a silent no-op on this runtime looks like a pass. Architect-review
-   (step 10, claude) remains the real gate until the antigravity spike passes.
-   (architect-review is still a `claude -p ... --agent architect-review` shell-out — verify that
-   invocation once for your installed Claude Code CLI too.)
-9. **On QA fail:** the issue returns to `status:6-qa-failed`. Read QA's report, then **re-run
+8. **Hand off to QA** (shell-out per QA's `environment:` in team.yaml — see "Cross-runtime
+   reality" above). Brief is the same — "Review PR for issue #<n> on branch issue-<n>. Run:
+   `GH_AGENT_ID=qa bash .ai-roster/skills/github_flow.sh qa-checkout <n>`, then follow
+   qa_instructions.md." "Did QA actually run" is a mechanical check: the branch must carry a
+   `test(e2e): AC coverage for #<n>` commit and the report must show real `dotnet test` output —
+   no commit, no trust in the label it set.
+9. **On QA fail:** the issue returns to `status:6-qa-failed`. Read QA's report — the red e2e
+   facts QA pushed onto the branch (`tests/e2e/Issue<n>Tests.cs`) are the machine-checkable
+   acceptance bar; the engineer's fix must turn them green and must NOT touch or drop them
+   (rules/git.md #5). Then **re-run
    step 3's `start <n>` first** — the lane was released at `publish`, so the worktree's
    `.lane-env` is stale and may point at a lane another issue now owns; `start` re-acquires a
    fresh lane and rewrites it (the worktree is clean post-commit, so the dirty-guard won't
