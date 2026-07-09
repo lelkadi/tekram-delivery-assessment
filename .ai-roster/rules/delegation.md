@@ -1,8 +1,9 @@
 # Delegation Rules (all agents)
 
 1. **Who dispatches whom:** `eng-lead` dispatches `backend-engineer`/`web-engineer` and hands
-   off to `qa`/`architect-review`. No other role dispatches another agent. Engineers never call
-   each other; QA and architect-review never dispatch anything, only report a verdict.
+   off to `architect-review`. QA picks up independently from the issue comment eng-lead posts
+   (eng-lead never shells out to QA). No other role dispatches another agent. Engineers never
+   call each other; QA and architect-review never dispatch anything, only report a verdict.
 2. **Briefs must be self-contained.** Anyone dispatching another agent (currently: `eng-lead`
    only) must give it everything needed — goal, files, spec excerpt, ACs, working directory. The
    receiving agent should never need to open the GitHub issue itself to understand its task.

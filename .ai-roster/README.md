@@ -70,9 +70,10 @@ and [rules/delegation.md](rules/delegation.md) for the full contract.
    spot-check?). Fails → new brief to the same engineer, back to step 4. Passes → `publish <n>
    "<summary>"` (push, open PR, → `5-in-review`, release the lane), posting the engineer's
    summary as the handoff comment.
-6. `qa`: `qa-checkout <n>` (read-only alias branch, own worktree, own lane) → runs the stack
-   from `.lane-env` → verdict label + one `qa-comment` on the PR. Fail → back to `eng-lead`
-   step 3 with QA's repro.
+ 6. `qa` picks up independently from the eng-lead's handoff comment on the issue:
+    `qa-checkout <n>` (read-only alias branch, own worktree, own lane) → runs the stack from
+    `.lane-env` → verdict label + one `qa-comment` on the PR. Fail → back to `eng-lead`
+    step 3 with QA's repro.
 7. `pm-verify` (human-triggered) scores against [rubric-checklist.md](rubric-checklist.md).
 8. `architect-review` reviews and either rejects (back to `eng-lead`) or merges + closes →
    `11-done`, then `cleanup <n>`. Only role that merges or closes a code issue.

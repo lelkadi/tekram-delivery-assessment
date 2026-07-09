@@ -73,12 +73,10 @@ once for your installed toolchain before relying on it.)
    claim and the lane (freeing it for the next dispatch). Post the engineer's summary (lightly
    edited for clarity, not rewritten) as the handoff comment — this is the audit trail; don't
    let it live only in your own context.
-8. **Hand off to QA** (shell-out per QA's `environment:` in team.yaml — see "Cross-runtime
-   reality" above). Brief is the same — "Review PR for issue #<n> on branch issue-<n>. Run:
-   `GH_AGENT_ID=qa bash .ai-roster/skills/github_flow.sh qa-checkout <n>`, then follow
-   qa_instructions.md." "Did QA actually run" is a mechanical check: the branch must carry a
-   `test(e2e): AC coverage for #<n>` commit and the report must show real `dotnet test` output —
-   no commit, no trust in the label it set.
+ 8. **Post findings for QA** — do NOT shell out to the QA agent. Instead, add a comment on the
+    GitHub issue with a clear handoff summary: PR link, branch, what was implemented, your
+    verification results (build, tests, live spot-check), and the engineer's summary. QA will
+    pick up the issue from this comment later and follow qa_instructions.md independently.
 9. **On QA fail:** the issue returns to `status:6-qa-failed`. Read QA's report — the red e2e
    facts QA pushed onto the branch (`dotnet test tests/e2e --filter issue=<n>` runs exactly
    this issue's facts) are the machine-checkable acceptance bar; the engineer's fix must turn
