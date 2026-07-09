@@ -12,6 +12,29 @@ brew update
 brew install gh jq
 ```
 
+## 1b. Docker (colima) + Compose CLI plugin
+Docker on this machine is colima; the Homebrew `docker` CLI (20.10) does **not** bundle the
+compose plugin, and the `docker-compose` formula (installed as a colima dependency) isn't linked
+anywhere the CLI looks. Without this wiring, `docker compose up -d` fails with
+`unknown shorthand flag: 'd'` — and agents may be tempted into ad-hoc `docker run` containers
+that squat the shared ports (forbidden, see `rules/infra.md`).
+```bash
+docker compose version   # if this errors, wire the plugin:
+mkdir -p ~/.docker/cli-plugins
+ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" ~/.docker/cli-plugins/docker-compose
+docker compose version   # ✅ Docker Compose version 5.x
+```
+Use the `opt/` path, not `Cellar/<version>/` — `opt/` survives `brew upgrade`; a Cellar link
+dangles when the version directory is swept. (If `opt/docker-compose` is missing, run
+`brew link docker-compose` first; a "Permission denied @ apply2files" error for a root-owned
+plugins dir is harmless — the `opt/` link is still created.)
+
+Then start the shared dev stack once (Postgres + Redis, TD-002 — one stack for all agents/lanes):
+```bash
+docker compose up -d
+docker compose ps   # postgres healthy, redis healthy
+```
+
 ## 2. `gh` authentication
 Recommended (decision #3): a fine-grained PAT exported as `GH_TOKEN`, scopes `repo`, `issues`,
 `pull_requests`, used by all agents non-interactively. Founder's own interactive session can instead
@@ -90,6 +113,7 @@ this only if the manual flow proves out first.
 ## Quick verification checklist
 ```bash
 gh auth status                                   # ✅ authenticated
+docker compose version                           # ✅ plugin wired (Compose v5.x)
 git --version                                    # ✅ >= 2.39
 node -e "require('js-yaml')"                     # ✅ no throw
 gh label list --repo lelkadi/tekram-delivery-assessment | wc -l    # ✅ ~26 labels

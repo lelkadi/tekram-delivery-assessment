@@ -103,6 +103,8 @@ skills below, which cost nothing until actually invoked):
 - [rules/delegation.md](rules/delegation.md) — who may brief/dispatch whom, briefs must be
   self-contained, verification precedes publication, merge/close authority is exclusive to
   `architect-review`.
+- [rules/infra.md](rules/infra.md) — one shared compose stack, never ad-hoc `docker run`
+  postgres/redis, port conflicts get surfaced not worked around, lanes isolate logically.
 
 Add a rule: drop a `.md` in `rules/`, re-run `npm run sync-agents`.
 

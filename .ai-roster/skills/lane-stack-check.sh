@@ -9,8 +9,16 @@ set -a; . ./.lane-env; set +a
 echo "lane env: PORT=$PORT DATABASE_URL=${DATABASE_URL##*@} REDIS_URL=$REDIS_URL"
 fail=0
 
+warn_adhoc() {  # $1 = container name, $2 = service — compose names are <project>-<service>-<n>
+  case "$1" in
+    *-"$2"-*) ;;
+    *) echo "WARN: $2 container '$1' is not compose-managed (ad-hoc docker run? see rules/infra.md)";;
+  esac
+}
+
 pg_ctr="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -m1 postgres || true)"
 if [ -n "$pg_ctr" ]; then
+  warn_adhoc "$pg_ctr" postgres
   db="${DATABASE_URL##*/}"
   docker exec "$pg_ctr" pg_isready -U postgres >/dev/null 2>&1 \
     && echo "postgres: up ($pg_ctr)" || { echo "FAIL: postgres container not ready"; fail=1; }
@@ -22,6 +30,7 @@ fi
 
 redis_ctr="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -m1 redis || true)"
 if [ -n "$redis_ctr" ]; then
+  warn_adhoc "$redis_ctr" redis
   docker exec "$redis_ctr" redis-cli ping 2>/dev/null | grep -q PONG \
     && echo "redis: up ($redis_ctr)" || { echo "FAIL: redis not answering PING"; fail=1; }
 else
