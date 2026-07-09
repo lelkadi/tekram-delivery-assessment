@@ -99,7 +99,7 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddTekramOpenApi(this IServiceCollection services)
     {
-        services.AddOpenApi();
+        services.AddSwaggerGen();
 
         return services;
     }
