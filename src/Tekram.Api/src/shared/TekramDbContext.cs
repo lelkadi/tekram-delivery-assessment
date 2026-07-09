@@ -58,7 +58,7 @@ public class TekramDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.UserId, e.Channel, e.CreatedAt })
-                  .HasFilter("consumed_at IS NULL")
+                  .HasFilter("\"ConsumedAt\" IS NULL")
                   .IsDescending(false, false, true);
         });
 
@@ -78,7 +78,7 @@ public class TekramDbContext : DbContext
             entity.Property(e => e.Longitude).HasColumnType("numeric(9,6)").IsRequired();
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("now()");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("now()");
-            entity.HasIndex(e => new { e.Status, e.Cuisine }).HasFilter("deleted_at IS NULL");
+            entity.HasIndex(e => new { e.Status, e.Cuisine }).HasFilter("\"DeletedAt\" IS NULL");
         });
 
         modelBuilder.Entity<MenuCategory>(entity =>
@@ -101,7 +101,7 @@ public class TekramDbContext : DbContext
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("now()");
             entity.HasOne<MenuCategory>().WithMany().HasForeignKey(e => e.CategoryId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Restaurant>().WithMany().HasForeignKey(e => e.RestaurantId).OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(e => e.RestaurantId).HasFilter("deleted_at IS NULL");
+            entity.HasIndex(e => e.RestaurantId).HasFilter("\"DeletedAt\" IS NULL");
         });
 
         modelBuilder.Entity<CustomizationGroup>(entity =>
