@@ -152,6 +152,30 @@ agents:
     instructions_file: "qa_instructions.md"
     skills: ["github_flow"]
 
+  # ── Stage 5: QA — opencode/DeepSeek dual-gate (TD-009) ──────────────────────
+  # DECISION (founder, 2026-07-09, TD-009): QA gets a second gate on opencode/deepseek-v4-pro as a
+  # companion to the claude-code/sonnet gate above. Model-family independence returns to the QA
+  # layer: sonnet (Anthropic) and deepseek-v4-pro (DeepSeek) run the same black-box e2e protocol
+  # independently. Either gate passing advances the issue (dual-gate — first PASS wins).
+  #
+  # QA on opencode reuses the same instructions_file and skills as Claude Code QA — the protocol
+  # is identical, only the runtime and model change. Unlike Claude Code where write_scope is prose
+  # guidance, opencode mechanically enforces permission.edit to tests/e2e/** (hard block).
+  qa-opencode:
+    display_name: "QA & Tester — opencode (e2e per AC)"
+    stage: "5-in-review -> {6-qa-failed | 7-qa-passed}"
+    environment: "opencode"
+    opencode_model: "deepseek/deepseek-v4-pro"
+    opencode_mode: "primary"
+    opencode_temperature: 0.15   # deterministic — test assertions must be precise
+    opencode_options:
+      thinking:
+        type: enabled
+        reasoning_effort: high   # reasoning-heavy — AC analysis and edge-case spotting
+    write_scope: ["tests/e2e/**"]   # HARD enforcement on opencode — mechanically blocked elsewhere
+    instructions_file: "qa_instructions.md"
+    skills: ["github_flow"]
+
   # ── Stage 6: PM verification (HUMAN-TRIGGERED gate — decision #1) ───────────
   pm-verify:
     display_name: "PM — Verification"

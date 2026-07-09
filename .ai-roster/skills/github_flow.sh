@@ -176,6 +176,13 @@ ensure_worktree_on_branch() {
     git -C "$wt" checkout -B "$local_branch" "origin/$remote_source"
   elif git -C "$wt" show-ref --verify --quiet "refs/heads/$local_branch"; then
     git -C "$wt" checkout "$local_branch"
+    # Fast-forward to origin in case it moved ahead since this local branch was created (e.g. a
+    # second `start` on an issue whose engineer pushed more commits after our first pass). --ff-only
+    # is safe unconditionally: it silently no-ops/fails on divergence, never discarding local-only
+    # commits, so an engineer's in-progress work on their own issue-<n> branch is untouched.
+    if git -C "$wt" show-ref --verify --quiet "refs/remotes/origin/$remote_source"; then
+      git -C "$wt" merge --ff-only "origin/$remote_source" --quiet 2>/dev/null || true
+    fi
   elif git -C "$wt" show-ref --verify --quiet "refs/remotes/origin/$remote_source"; then
     git -C "$wt" checkout -b "$local_branch" "origin/$remote_source"
   else
