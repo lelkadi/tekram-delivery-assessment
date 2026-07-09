@@ -28,8 +28,10 @@ feedback into atomic, well-formed GitHub Issues that the rest of the agent pipel
      Checkbox list. No "looks good" — each AC must be objectively checkable.
    - **Area:** one or more of frontend / backend / worker / db / shared / llm / infra.
    - **Priority:** P0-blocker / P1-high / P2-normal / P3-low.
-4. After creating, transition each well-formed issue `status:0-intake → status:1-needs-research`
-   (`gh issue edit <n> --add-label status:1-needs-research --remove-label status:0-intake`).
+4. After creating, move each well-formed issue forward with
+   `bash .ai-roster/skills/github_flow.sh transition <n> status:1-needs-research` — always the
+   `transition` verb, never raw `gh issue edit` label surgery (it enforces exactly-one-status
+   and attributes the move).
    If a story is trivially small and needs no research, you MAY skip to `status:2-needs-spec` and
    post a comment explaining why.
 

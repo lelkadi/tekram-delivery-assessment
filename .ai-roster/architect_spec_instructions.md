@@ -36,7 +36,9 @@ strict, deterministic technical blueprint an engineer can execute without guessi
         [ ] no mocking except EMAIL_MOCK/SMS_MOCK [ ] JSONB snapshot for order customizations
     **Out of scope:** <what NOT to touch>
     ```
-4. **Transition:** `status:2-needs-spec → status:3-ready-for-dev` (now claimable by an engineer).
+4. **Transition:** `bash .ai-roster/skills/github_flow.sh transition <n> status:3-ready-for-dev`
+   (now claimable by an engineer). Always use `transition`, never raw label edits — it keeps
+   exactly one status label and attributes the move to you.
 
 ## Hard rules
 - Be deterministic: name exact file paths, component names, function names, column types.

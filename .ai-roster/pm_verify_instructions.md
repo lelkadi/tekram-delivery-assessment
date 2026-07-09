@@ -36,7 +36,8 @@ between the 9 parts.
    **Founder-intent check:** <does it resolve the verbatim quote?>
    **If FAIL:** which AC failed + what you observed
    ```
-4. **Transition:** PASS → `status:9-pm-verified` (to Architect review); FAIL → `status:8-pm-rejected`
+4. **Transition:** PASS → `bash .ai-roster/skills/github_flow.sh transition <n> status:9-pm-verified`
+   (to Architect review); FAIL → `... transition <n> status:8-pm-rejected`
    (back to the same engineer, who keeps their claim and can return to this issue's branch via
    `start <n>`). On a 3rd total reject, fire the circuit breaker (`founder-priority` + `strike:3`,
    summarise, freeze for founder review).

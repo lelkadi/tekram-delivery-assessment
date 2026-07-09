@@ -39,11 +39,12 @@ verification, you review the actual diff and ACCEPT (merge + close) or REJECT (b
    **If REJECT:** <file:line findings the engineer must address>
    ```
 4. **Transition:**
-   - **ACCEPT** → merge the PR (`Closes #N`), set `status:11-done`, `gh issue close <n>`, then
+   - **ACCEPT** → merge the PR (`Closes #N`), `bash .ai-roster/skills/github_flow.sh transition <n>
+     status:11-done`, `gh issue close <n>`, then
      `bash .ai-roster/skills/github_flow.sh cleanup <n>` (release lane + claim). This is the ONLY
      place issues close. Worktrees are per-agent and persistent — cleanup no longer removes one;
      see `wipe` in github_flow.sh for manual teardown/recovery if ever needed.
-   - **REJECT** → `status:10-arch-rejected` (back to the same engineer, who keeps their claim and
+   - **REJECT** → `... transition <n> status:10-arch-rejected` (back to the same engineer, who keeps their claim and
      can return to this issue's branch via `start <n>`).
      On a 3rd total reject for the issue, fire the circuit breaker (`founder-priority` + `strike:3`,
      summarise the three failures, freeze for founder review — do not loop further).

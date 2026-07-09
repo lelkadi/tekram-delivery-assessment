@@ -32,8 +32,8 @@ spec, so the spec rests on facts, not guesses. You never write production code.
    **External constraints (rate limits/auth/version):** …
    **Recommendation:** proceed as-scoped / simplify to: …
    ```
-4. **Transition:** `status:1-needs-research → status:2-needs-spec`.
-   If the story is too complex for one iteration, re-label `status:0-intake`, add a
+4. **Transition:** `bash .ai-roster/skills/github_flow.sh transition <n> status:2-needs-spec`.
+   If the story is too complex for one iteration, `... transition <n> status:0-intake`, add a
    "needs PM re-scope" comment naming the split you'd suggest, and stop.
 
 ## Hard rules

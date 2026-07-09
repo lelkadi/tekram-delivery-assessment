@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # github_flow.sh — state-machine skill for the Tekram issue-driven agent workflow.
-# Worktree-aware, claim-aware, lane-aware. Used by Claude Code, opencode, and Antigravity agents.
+# Worktree-aware, claim-aware, lane-aware. Runtime-agnostic: used by every agent regardless of
+# which runtime team.yaml currently assigns it to.
 #
 # Worktrees are PER AGENT ROLE, not per issue: each $GH_AGENT_ID gets exactly one persistent
 # worktree at $WORKTREE_ROOT/$GH_AGENT_ID, reused across every issue that agent handles — `start`
@@ -10,8 +11,10 @@
 # worker-engineer, qa) — if left at the default, every role collides on the same worktree.
 #
 # Env knobs:
-#   GH_AGENT_ID     agent role identity for claims/commits/worktree naming (default: eng-1 — set
-#                   this explicitly per role, see above)
+#   GH_AGENT_ID     agent role identity for claims/commits/worktree naming. REQUIRED (no default)
+#                   for every command that claims, writes, comments, or touches a worktree — all
+#                   agents share one PAT, so this id is the ONLY attribution in logs and commits.
+#                   Enforced here, not in instructions: the script refuses to run without it.
 #   WORKTREE_ROOT   where per-agent worktrees live (default: ~/.agent-worktrees/tekram-delivery-assessment)
 #   MAX_LANES       concurrent live-stack lanes (default: 3 = parallel; set 1 to serialize).
 #                   Issues labeled type:doc never acquire a lane — they don't run the stack.
@@ -24,12 +27,33 @@
 set -euo pipefail
 
 REPO="lelkadi/tekram-delivery-assessment"
-AGENT_ID="${GH_AGENT_ID:-eng-1}"
+AGENT_ID="${GH_AGENT_ID:-}"
 WORKTREE_ROOT="${WORKTREE_ROOT:-$HOME/.agent-worktrees/tekram-delivery-assessment}"
 LANE_DIR="${LANE_DIR:-$HOME/.agent-worktrees/.lanes}"
 MAX_LANES="${MAX_LANES:-3}"
 
-# ── guards ───────────────────────────────────────────────────────────────────
+COMMAND="${1:-help}"; shift || true
+
+# Identity guard (BEFORE the network guards — fail on the cheapest misconfiguration first):
+# every command that claims, writes, comments, or touches a worktree REQUIRES an explicit
+# GH_AGENT_ID. All agents share one PAT, so GitHub's timeline shows one user for everything —
+# this id is the only attribution in logs/commits. The old silent default ('eng-1') collided
+# worktrees across roles and hid who did what; refuse loudly instead.
+case "$COMMAND" in
+  claim|start|qa-checkout|submit|publish|qa-comment|transition|release|wipe)
+    [ -n "$AGENT_ID" ] || {
+      echo "Error: GH_AGENT_ID is not set — export a stable per-role id from team.yaml (e.g. backend-engineer, qa, eng-lead) before '$COMMAND'. Refusing to run unattributed." >&2
+      exit 1
+    }
+    ;;
+esac
+# One-line breadcrumb on every invocation — greppable across runtimes' logs.
+echo "[github_flow] $(date -u +%FT%TZ) agent=${AGENT_ID:-<none>} cmd=$COMMAND args: $*" >&2
+
+# ── guards (skipped for local-only commands: help/lanes/release/wipe touch no GitHub API,
+#            and `release` especially must work as the escape hatch when gh auth is broken) ──
+case "$COMMAND" in help|-h|--help|lanes|release|wipe) NEEDS_GH=0 ;; *) NEEDS_GH=1 ;; esac
+if [ "$NEEDS_GH" = 1 ]; then
 command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not installed (brew update && brew install gh)"; exit 1; }
 # Auto-source the repo-scoped PAT so agents never rely on the operator's global gh login
 # (which is scoped to a different repo). Works from worktrees too: --git-common-dir resolves
@@ -48,16 +72,15 @@ if [ -z "${GH_TOKEN:-}" ]; then
   fi
 fi
 gh auth status >/dev/null 2>&1 || { echo "Error: gh not authenticated — run 'gh auth login' or export GH_TOKEN"; exit 1; }
+fi
 mkdir -p "$WORKTREE_ROOT" "$LANE_DIR"
-
-COMMAND="${1:-help}"; shift || true
 
 # ── lane helpers (serialized v1: MAX_LANES=1 → a single global stack lock) ─────
 acquire_lane() {  # $1 = issue ; echoes lane number or fails
   local issue="$1" n
   for n in $(seq 1 "$MAX_LANES"); do
     local lock="$LANE_DIR/lane-$n.lock"
-    if ( set -o noclobber; echo "issue=$issue pid=$$ at=$(date -u +%FT%TZ)" > "$lock" ) 2>/dev/null; then
+    if ( set -o noclobber; echo "issue=$issue agent=${AGENT_ID:-<none>} pid=$$ at=$(date -u +%FT%TZ)" > "$lock" ) 2>/dev/null; then
       echo "$n"; return 0
     fi
   done
@@ -86,6 +109,38 @@ lane_env() {  # $1 = lane number → prints lane-scoped env
 
 is_doc_issue() {  # $1 = issue → 0 if labeled type:doc (no live stack, no lane needed)
   gh issue view "$1" --repo "$REPO" --json labels -q '.labels[].name' | grep -q '^type:doc$'
+}
+
+assert_not_epic() {  # $1 = issue — epics/parents are tracking-only: never claimed, worked, or transitioned.
+  # An epic's progress IS its task-list checkboxes (auto-checked as children close) — it carries
+  # no status:* label and never enters a queue. Any epic reaching a work verb was mislabeled, or
+  # a decomposition forgot to convert its parent (add `epic`, strip `status:*`).
+  local n="$1"
+  if gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep -q '^epic$'; then
+    echo "ERROR: issue #$n is labeled 'epic' — tracking-only, not workable. Work its sub-issues instead." >&2
+    echo "(If it was just decomposed, also strip its status:* label so it stops matching fetches.)" >&2
+    return 1
+  fi
+}
+
+assert_single_status() {  # $1 = issue — loud-fail unless exactly one status:* label remains
+  local n="$1" count
+  count="$(gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep -c '^status:' || true)"
+  if [ "$count" -ne 1 ]; then
+    echo "ERROR: issue #$n carries $count status:* labels (must be exactly 1):" >&2
+    gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep '^status:' >&2 || true
+    echo "Fix the labels on GitHub before proceeding — a dual/missing status corrupts the state machine." >&2
+    return 1
+  fi
+}
+
+set_worktree_identity() {  # $1 = worktree — commits from this worktree are authored as the agent.
+  # Per-worktree config (git >= 2.20): the shared PAT makes every push look like one GitHub user,
+  # so the commit author is the only per-agent attribution in history.
+  local wt="$1"
+  git -C "$wt" config extensions.worktreeConfig true
+  git -C "$wt" config --worktree user.name "$AGENT_ID"
+  git -C "$wt" config --worktree user.email "$AGENT_ID@agents.tekram.local"
 }
 
 # ── worktree helpers (per-agent persistent worktree, branch-switched per issue) ────────────────
@@ -132,13 +187,16 @@ case "$COMMAND" in
   fetch)
     LABEL="status:3-ready-for-dev"
     [ "${1:-}" = "--label" ] && LABEL="$2"
-    echo "Fetching issues labeled '$LABEL' (excluding claimed)..." >&2
+    echo "Fetching issues labeled '$LABEL' (excluding claimed + epics, oldest first)..." >&2
+    # sort:created-asc — work the backlog FIFO: oldest issue first, never newest-first starvation
+    # -label:epic — epics/parents are tracking-only; belt-and-braces with assert_not_epic in claim
     gh issue list --repo "$REPO" --label "$LABEL" \
-      --search '-label:"agent:claimed"' --json number,title,labels --limit 5
+      --search '-label:"agent:claimed" -label:epic sort:created-asc' --json number,title,labels --limit 5
     ;;
 
   claim)  # claim <issue> — check-then-act + read-back tiebreak (GitHub has no label CAS)
     n="${1:?Usage: claim <issue>}"
+    assert_not_epic "$n" || exit 1
     if gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep -q '^agent:claimed:'; then
       echo "Issue #$n already claimed — pick another."; exit 1
     fi
@@ -155,6 +213,7 @@ case "$COMMAND" in
       gh issue edit "$n" --repo "$REPO" --remove-label "agent:claimed:$AGENT_ID"
       exit 1
     fi
+    assert_single_status "$n"
     echo "Claimed #$n as $AGENT_ID."
     ;;
 
@@ -162,12 +221,14 @@ case "$COMMAND" in
           # type:doc issues skip lanes + .lane-env + install entirely: they never run the live
           # stack, so they must not consume a lane that an engineer or QA needs.
     n="${1:?Usage: start <issue> [lane]}"
+    assert_not_epic "$n" || exit 1
     branch="issue-$n"
     wt="$WORKTREE_ROOT/$AGENT_ID"
     if is_doc_issue "$n"; then
       git -C "$(git rev-parse --show-toplevel)" fetch origin --quiet
       gh issue develop "$n" --repo "$REPO" --name "$branch" --base main >/dev/null 2>&1 || true
       ensure_worktree_on_branch "$wt" "$branch" "$branch" "origin/main" || exit 1
+      set_worktree_identity "$wt"
       echo "Ready (doc issue — no lane): branch '$branch' checked out in $AGENT_ID's worktree '$wt'. cd \"$wt\" to begin."
       exit 0
     fi
@@ -177,6 +238,7 @@ case "$COMMAND" in
     # create the linked branch (best effort) before resolving it below
     gh issue develop "$n" --repo "$REPO" --name "$branch" --base main >/dev/null 2>&1 || true
     ensure_worktree_on_branch "$wt" "$branch" "$branch" "origin/main" || exit 1
+    set_worktree_identity "$wt"
     lane_env "$lane" > "$wt/.lane-env"
     echo "Lane $lane env written to $wt/.lane-env — source it before running the stack."
     ( cd "$wt" && corepack pnpm install --frozen-lockfile >/dev/null 2>&1 ) && echo "pnpm install done."
@@ -188,6 +250,7 @@ case "$COMMAND" in
                 # that name may be checked out in the engineer's OWN worktree at the same time, and
                 # git refuses to check out one branch in two worktrees at once)
     n="${1:?Usage: qa-checkout <issue> [lane]}"
+    assert_not_epic "$n" || exit 1
     branch="issue-$n"
     qa_branch="qa-issue-$n"
     wt="$WORKTREE_ROOT/$AGENT_ID"
@@ -198,6 +261,7 @@ case "$COMMAND" in
     # force=1: always reset qa-issue-<n> to match origin/issue-<n> — QA re-reviews after an
     # engineer's force-push fix must see the latest commits, and QA never commits to this branch.
     ensure_worktree_on_branch "$wt" "$qa_branch" "$branch" "origin/main" 1 || exit 1
+    set_worktree_identity "$wt"
     lane_env "$lane" > "$wt/.lane-env"
     echo "Lane $lane env written to $wt/.lane-env — source it before running the stack."
     ( cd "$wt" && corepack pnpm install --frozen-lockfile >/dev/null 2>&1 ) && echo "pnpm install done."
@@ -226,7 +290,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     # the next stage that needs it (qa-checkout acquires its own lane) — holding it all the way to
     # Architect-accept would deadlock qa-checkout for no reason.
     release_lane "$n"
-    echo "Submitted #$n → status:5-in-review."
+    assert_single_status "$n"
+    echo "Submitted #$n → status:5-in-review (lane released)."
     ;;
 
   publish)  # publish <issue> "<msg>" — LEAD-ORCHESTRATED FLOW ONLY: the engineer already committed
@@ -249,13 +314,45 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     claim_label=$(gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep '^agent:claimed:' || true)
     [ -n "$claim_label" ] && gh issue edit "$n" --repo "$REPO" --remove-label "$claim_label"
     release_lane "$n"
-    echo "Published #$n → status:5-in-review."
+    assert_single_status "$n"
+    echo "Published #$n → status:5-in-review (lane released)."
     ;;
 
   qa-comment)
     pr="${1:?Usage: qa-comment <pr> \"<message>\"}"; msg="${2:?message required}"
-    gh pr comment "$pr" --repo "$REPO" --body "$msg"
-    echo "Posted QA comment to PR #$pr."
+    gh pr comment "$pr" --repo "$REPO" --body "$msg
+
+<sub>posted by \`$AGENT_ID\` via github_flow</sub>"
+    echo "Posted QA comment to PR #$pr as $AGENT_ID."
+    ;;
+
+  transition)  # transition <issue> <status-label> — THE one way to move an issue between stages:
+               # removes every other status:* label, adds the new one, asserts exactly-one-status,
+               # leaves an attribution comment (all agents share one PAT — without the comment the
+               # timeline can't say WHO moved it), and releases any lane the issue holds (a
+               # transition means this agent's active work on the issue is done — locks never
+               # outlive the stage; idempotent if no lane is held).
+    n="${1:?Usage: transition <issue> <status-label>}"
+    new="${2:?new status label required (e.g. status:7-qa-passed)}"
+    assert_not_epic "$n" || exit 1
+    case "$new" in status:*) ;; *) new="status:$new" ;; esac
+    args=()
+    while IFS= read -r s; do
+      [ -n "$s" ] && [ "$s" != "$new" ] && args+=(--remove-label "$s")
+    done < <(gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep '^status:' || true)
+    gh issue edit "$n" --repo "$REPO" --add-label "$new" "${args[@]}"
+    assert_single_status "$n"
+    gh issue comment "$n" --repo "$REPO" --body "→ \`$new\` by \`$AGENT_ID\` at $(date -u +%FT%TZ)"
+    release_lane "$n"
+    echo "Transitioned #$n → $new (by $AGENT_ID; lane released if held)."
+    ;;
+
+  release)  # release <issue> — explicitly free any lane lock this issue holds. Idempotent.
+            # Normally implicit (submit/publish/transition/cleanup all release), but here as the
+            # manual escape hatch so a stuck lock never requires editing $LANE_DIR by hand.
+    n="${1:?Usage: release <issue>}"
+    release_lane "$n"
+    echo "Released any lane held by #$n."
     ;;
 
   cleanup)  # cleanup <issue> — release lane + claim (run on accept/merge). Worktrees are now
@@ -290,7 +387,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
   *)
     cat >&2 <<'EOF'
-Careeree GitHub Flow skill — commands:
+Tekram GitHub Flow skill — commands:
   fetch  [--label <status>]                list ready, unclaimed issues (default status:3-ready-for-dev)
   claim  <issue>                           claim with read-back tiebreak
   start  <issue> [lane]                    checkout branch issue-<n> in THIS agent's persistent
@@ -304,14 +401,19 @@ Careeree GitHub Flow skill — commands:
                                             the engineer already committed locally; lead runs this
                                             FROM INSIDE the engineer's worktree after inspecting
                                             the commit (see eng_lead_instructions.md)
-  qa-comment <pr> "<message>"              post QA report to a PR
+  qa-comment <pr> "<message>"              post QA report to a PR (attributed to $GH_AGENT_ID)
+  transition <issue> <status-label>        THE way to change stage: swap status:* labels (asserts
+                                            exactly one remains), comment attribution, release lane
+  release <issue>                          explicitly free the issue's lane lock (idempotent escape
+                                            hatch — submit/publish/transition already release)
   cleanup <issue>                          release lane + claim (on accept). Worktree persists.
   wipe                                     force-remove THIS agent's persistent worktree (manual
                                             recovery only — not part of the normal per-issue flow)
   lanes                                    show lane occupancy
 
-GH_AGENT_ID must be set to a stable per-role id (web-engineer, backend-engineer, worker-engineer,
-qa) before calling start/qa-checkout/wipe — worktrees are now keyed by agent role, not by issue.
+GH_AGENT_ID is REQUIRED (stable per-role id from team.yaml, e.g. backend-engineer, qa, eng-lead)
+for every command that claims, writes, comments, or touches a worktree — all agents share one
+PAT, so this id is the only attribution in logs, comments, and commit authorship.
 EOF
     exit 1
     ;;
