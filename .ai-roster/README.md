@@ -108,6 +108,12 @@ skills below, which cost nothing until actually invoked):
 
 Add a rule: drop a `.md` in `rules/`, re-run `npm run sync-agents`.
 
+**Authoring convention:** instruction files (`*_instructions.md`) must NOT hardcode any agent's
+runtime, model, or effort — that configuration lives ONLY in [team.yaml](team.yaml), and
+instructions that need it say "look it up in team.yaml". Hardcoded copies go stale on every
+roster change and silently misdirect cross-runtime dispatches. (Summary tables in this README /
+the PMP mirror team.yaml and are updated with it.)
+
 ## Skills (loaded on demand, not injected into every prompt)
 
 Unlike `rules/`, these cost nothing unless actually invoked — right for anything that's only
@@ -134,9 +140,9 @@ sometimes relevant, so it doesn't tax every other task:
 - Env every agent needs: `GH_AGENT_ID=<role-id>` (worktree + claim identity — `GH_TOKEN` is
   self-sourced by `github_flow.sh`/`gh-env.sh` from the untracked repo-local credential file, no
   env setup needed), `MAX_LANES` (default 3).
-- Cross-runtime handoffs (opencode ↔ claude-code) are always a CLI shell-out — there's no native
-  call between the two products. `eng-lead` (opencode) reaches `qa`/`architect-review`
-  (claude-code) via the `claude` CLI, and reaches engineers (opencode) via `opencode run`.
+- Cross-runtime handoffs are always a CLI shell-out — there's no native call between the runtime
+  products. Which runtime an agent lives in comes from [team.yaml](team.yaml) (`environment:`);
+  claude-code agents are reached via the `claude` CLI, opencode agents via `opencode run`.
 
 ## Bootstrap order (H0–H2)
 

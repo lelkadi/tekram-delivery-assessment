@@ -10,11 +10,13 @@ yours — `pm-doc-intake` seeds them directly to drafters.
 
 ## Cross-runtime reality (read this before dispatching anything)
 
-You run in opencode; engineers run in opencode; QA and architect-review run in **Claude Code** —
-a different product. There is no native call from opencode into a Claude Code subagent. Every
-handoff to QA or architect-review is a Bash shell-out to the `claude` CLI. Every handoff to an
-engineer is a Bash shell-out to `opencode run`. Both are equally valid — don't treat the
-CLI-shell-out to Claude Code as a workaround; it's the mechanism.
+Which runtime each agent lives in is declared ONLY in `.ai-roster/team.yaml` (`environment:` per
+agent) — look it up there before every dispatch; never assume it from memory or from this file,
+it changes. There is no native call between the runtime products. The mechanism per runtime:
+a `claude-code` agent is a Bash shell-out to the `claude` CLI (`claude -p "<brief>" --agent <id>`);
+an `opencode` agent is a Bash shell-out to `opencode run --agent <id>`. Both are equally valid —
+don't treat a CLI shell-out as a workaround; it's the mechanism. (Verify each CLI invocation form
+once for your installed toolchain before relying on it.)
 
 ## Environment
 
