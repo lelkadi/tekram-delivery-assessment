@@ -194,6 +194,18 @@ case "$COMMAND" in
       --search '-label:"agent:claimed" -label:epic sort:created-asc' --json number,title,labels --limit 5
     ;;
 
+  view)  # view <issue> [--comments] — read-only fetch of ONE issue: title, state, labels, body.
+         # --comments appends the comment thread, which is where the pipeline's artifacts live
+         # (Research Notes, Architect Spec, QA reports, transition attributions). No GH_AGENT_ID
+         # needed — nothing is claimed or written.
+    n="${1:?Usage: view <issue> [--comments]}"
+    gh issue view "$n" --repo "$REPO"
+    if [ "${2:-}" = "--comments" ]; then
+      echo ""
+      gh issue view "$n" --repo "$REPO" --comments
+    fi
+    ;;
+
   claim)  # claim <issue> — check-then-act + read-back tiebreak (GitHub has no label CAS)
     n="${1:?Usage: claim <issue>}"
     assert_not_epic "$n" || exit 1
@@ -389,6 +401,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     cat >&2 <<'EOF'
 Tekram GitHub Flow skill — commands:
   fetch  [--label <status>]                list ready, unclaimed issues (default status:3-ready-for-dev)
+  view   <issue> [--comments]              read-only: one issue's title/labels/body; --comments adds
+                                            the thread (Research Notes, Architect Spec, QA reports)
   claim  <issue>                           claim with read-back tiebreak
   start  <issue> [lane]                    checkout branch issue-<n> in THIS agent's persistent
                                             worktree ($WORKTREE_ROOT/$GH_AGENT_ID) + lane + .lane-env
