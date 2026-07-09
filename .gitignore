@@ -16,3 +16,13 @@ coverage/
 .claude/
 ORIGINAL_REQUEST.md
 CLAUDE.md
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.vs/
+.vscode/
+*.DotSettings.user
+*.sln.docstates
