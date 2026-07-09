@@ -352,7 +352,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
     while IFS= read -r s; do
       [ -n "$s" ] && [ "$s" != "$new" ] && args+=(--remove-label "$s")
     done < <(gh issue view "$n" --repo "$REPO" --json labels -q '.labels[].name' | grep '^status:' || true)
-    gh issue edit "$n" --repo "$REPO" --add-label "$new" "${args[@]}"
+    # ${args[@]+...}: bash 3.2 (macOS /bin/bash) treats "${args[@]}" on an empty array as unbound
+    # under set -u, so a no-op transition (label already current) would crash instead of no-op
+    gh issue edit "$n" --repo "$REPO" --add-label "$new" ${args[@]+"${args[@]}"}
     assert_single_status "$n"
     gh issue comment "$n" --repo "$REPO" --body "→ \`$new\` by \`$AGENT_ID\` at $(date -u +%FT%TZ)"
     release_lane "$n"
