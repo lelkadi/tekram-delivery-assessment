@@ -23,9 +23,16 @@ is keyed by this id (`~/.agent-worktrees/tekram-delivery-assessment/qa`), reused
 Every issue you review leaves behind a black-box e2e suite derived from its acceptance criteria.
 This suite IS your verdict's evidence; the PR comment just summarizes it.
 
-- **Location:** `tests/e2e/Issue<N>Tests.cs` — one xUnit `[Fact]` per AC, named `AC<i>_<Behavior>`
-  (e.g. `AC2_InvalidCouponReturns422`). First run ever: scaffold the project with
-  `dotnet new xunit -o tests/e2e -n Tekram.E2E`.
+- **Location:** `tests/e2e/<Module>/<Feature>Tests.cs` (e.g. `tests/e2e/Auth/RegistrationTests.cs`)
+  — module folders mirror the architecture (`Auth`/`Restaurants`/`Orders`), file named by the
+  FEATURE under test, never by the issue: tests outlive issues. ONE xUnit project for the whole
+  suite (first run ever: `dotnet new xunit -o tests/e2e -n Tekram.E2E`), module subfolders only —
+  never a csproj per module.
+- **Traceability:** every test class you touch for issue `<n>` carries `[Trait("issue", "<n>")]`
+  (a class may accumulate traits across issues), and each AC gets one `[Fact]` named
+  `AC<i>_<Behavior>` (e.g. `AC2_InvalidCouponReturns422`). `dotnet test --filter issue=<n>`
+  must reproduce exactly that issue's acceptance bar — that filter is what the engineer's fix
+  loop and eng-lead's mechanical check key on.
 - **Black-box only:** plain `HttpClient` against the RUNNING lane API
   (`http://localhost:$PORT` from `.lane-env`). NO project reference to `src/**` and NO
   `WebApplicationFactory` — that's the engineers' in-process style; yours stays deliberately
@@ -33,8 +40,9 @@ This suite IS your verdict's evidence; the PR comment just summarizes it.
 - **Env-gated:** read the base URL from `E2E_BASE_URL`; every fact must `Skip` when it is unset,
   so a bare `dotnet test` (e.g. CI without a live stack) stays green. You run the suite with:
   `E2E_BASE_URL=http://localhost:$PORT dotnet test tests/e2e`.
-- **Write scope:** `tests/e2e/**` is the ONLY path you ever write. Existing issue files are yours
-  to update on re-review; never touch `src/**` or the engineer's tests.
+- **Write scope:** `tests/e2e/**` is the ONLY path you ever write. Existing module files are
+  yours to extend (two issues touching the same module share a file — append/adjust your own
+  issue's facts, never weaken another issue's); never touch `src/**` or the engineer's tests.
 
 ## Execution protocol
 1. **Find work:** `bash .ai-roster/skills/github_flow.sh fetch --label status:5-in-review`. Pick one.
@@ -51,7 +59,8 @@ This suite IS your verdict's evidence; the PR comment just summarizes it.
    stack is up, your lane's database exists, and your `.lane-env` isn't stale (pointing at a
    lane another issue now owns). Fix any FAIL before testing — results against the wrong lane's
    database are worthless. Then, BEFORE probing by hand, translate every AC from the issue and
-   the Architect Spec comment into `tests/e2e/Issue<N>Tests.cs` (see E2E suite contract above) —
+   the Architect Spec comment into `tests/e2e/<Module>/<Feature>Tests.cs` facts tagged
+   `[Trait("issue", "<n>")]` (see E2E suite contract above) —
    the suite is the verification; ad-hoc `curl` is for exploring failures and edge cases the ACs
    imply but don't spell out:
     - For Part 2 (backend, no UI): run your e2e suite, `curl` the edge cases (invalid coupon,
@@ -70,7 +79,7 @@ This suite IS your verdict's evidence; the PR comment just summarizes it.
     ```
     ## 🧪 QA Results — <date>, agent: qa
     **Verdict:** PASS / FAIL
-    **Tests saved:** tests/e2e/Issue<N>Tests.cs — <M> facts, one per AC (commit <sha>)
+    **Tests saved:** tests/e2e/<Module>/<file(s)> — <M> facts, one per AC, trait issue=<n> (commit <sha>)
     **Tests run:** <your e2e suite + engineer's xUnit suites, dotnet test output> (lane:<n>)
     **Spec compliance:** <AC-by-AC checklist, curl output excerpts>
     **If FAIL:** exact repro + expected vs actual (name the red e2e facts)

@@ -255,14 +255,21 @@ there is slack to migrate; or evidence of correlated misses between QA and archi
 evaporates after the verdict, re-verifies nothing on later regressions, and (after TD-007 put QA
 in the reviewers' model family) carries no independent weight of its own.
 
-**Decision.** For every code issue it reviews, QA writes `tests/e2e/Issue<N>Tests.cs`: one xUnit
-fact per acceptance criterion, black-box `HttpClient` against the running lane API — no project
-reference to `src/**`, no `WebApplicationFactory` (deliberately decorrelated from the engineers'
-in-process integration tests) — env-gated by `E2E_BASE_URL` (facts skip when unset, so a bare
-`dotnet test` in CI without a live stack stays green). The suite is committed atomically
+**Decision.** For every code issue it reviews, QA writes module-organized black-box tests under
+`tests/e2e/<Module>/<Feature>Tests.cs` (one xUnit project, module folders mirroring
+`Auth`/`Restaurants`/`Orders` — files named by feature, not issue: tests outlive issues): one
+fact per acceptance criterion named `AC<i>_<Behavior>`, each touched class tagged
+`[Trait("issue", "<n>")]` so `dotnet test --filter issue=<n>` reproduces exactly that issue's
+acceptance bar. Black-box `HttpClient` against the running lane API — no project reference to
+`src/**`, no `WebApplicationFactory` (deliberately decorrelated from the engineers' in-process
+integration tests) — env-gated by `E2E_BASE_URL` (facts skip when unset, so a bare `dotnet test`
+in CI without a live stack stays green). The suite is committed atomically
 (`test(e2e): AC coverage for #<n>`) and pushed onto the PR branch **PASS or FAIL** — red facts are
 the rejection's machine-checkable repro, and the engineer's fix must turn them green.
 `tests/e2e/**` is QA's only write scope; engineers must never edit or weaken it (rules/git.md #5).
+*(2026-07-09, same day: layout changed from the initial per-issue `Issue<N>Tests.cs` to the
+module layout above — per-issue files are meaningless after merge and don't compose into a
+regression harness; issue traceability moved into the trait.)*
 
 **Consequences.** QA is no longer strictly read-only (write scope carved to `tests/e2e/**`). The
 accumulated suite doubles as a regression harness for later issues. The eng-lead's "did QA

@@ -80,9 +80,9 @@ once for your installed toolchain before relying on it.)
    `test(e2e): AC coverage for #<n>` commit and the report must show real `dotnet test` output —
    no commit, no trust in the label it set.
 9. **On QA fail:** the issue returns to `status:6-qa-failed`. Read QA's report — the red e2e
-   facts QA pushed onto the branch (`tests/e2e/Issue<n>Tests.cs`) are the machine-checkable
-   acceptance bar; the engineer's fix must turn them green and must NOT touch or drop them
-   (rules/git.md #5). Then **re-run
+   facts QA pushed onto the branch (`dotnet test tests/e2e --filter issue=<n>` runs exactly
+   this issue's facts) are the machine-checkable acceptance bar; the engineer's fix must turn
+   them green and must NOT touch or drop them (rules/git.md #5). Then **re-run
    step 3's `start <n>` first** — the lane was released at `publish`, so the worktree's
    `.lane-env` is stale and may point at a lane another issue now owns; `start` re-acquires a
    fresh lane and rewrites it (the worktree is clean post-commit, so the dirty-guard won't
