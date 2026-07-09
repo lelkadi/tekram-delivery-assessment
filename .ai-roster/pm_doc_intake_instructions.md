@@ -12,7 +12,12 @@ agent pipeline executes. Repo: `lelkadi/tekram-delivery-assessment`.
 1. **Epics** — one per assessment part that has more than one work item (at minimum Part 2).
    Labels: `epic` + `part-<n>` + `priority:*`. Epics are **tracking-only**:
    - NEVER add a `status:*` label an agent fetches on (`status:3-ready-for-dev` especially) —
-     agents must never claim an epic.
+     agents must never claim an epic. `github_flow.sh` enforces this: fetch excludes
+     `-label:epic`, and claim/start/transition refuse an epic-labeled issue.
+   - This applies to CONVERTED parents too: whenever an existing work issue is decomposed into
+     sub-issues (task list of `- [ ] #<n>`), the decomposer must, in the same edit, add `epic`
+     and strip the parent's `status:*` + `type:*` labels — otherwise the parent sits in a queue
+     forever with a status that never moves.
    - Body: rubric points + minimum threshold, deliverable file path(s), and a task list of
      sub-issues, one per line, exactly `- [ ] #<n>` — GitHub auto-checks each box when that
      sub-issue closes, so the epic shows live progress with no maintenance.

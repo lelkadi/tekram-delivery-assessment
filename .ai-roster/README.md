@@ -133,7 +133,10 @@ sometimes relevant, so it doesn't tax every other task:
 
 ## Conventions cheat-sheet
 
-- Epics: `epic` + `part-N` labels, tracking-only, never claimable, task-list body.
+- Epics: `epic` + `part-N` labels, tracking-only, never claimable, task-list body — and NO
+  `status:*`/`type:*` labels (progress = task-list checkboxes; the script's fetch excludes
+  `-label:epic` and claim/start/qa-checkout/transition refuse epics). Decomposing a work issue
+  into sub-issues converts it: add `epic`, strip its `status:*`/`type:*` in the same edit.
 - Comments: one per handoff, posted on the **work issue** (never the epic); researcher/spec/QA
   comments use their exact greppable headings.
 - Only `architect-review` closes work issues; `pm-doc-intake` closes finished epics.

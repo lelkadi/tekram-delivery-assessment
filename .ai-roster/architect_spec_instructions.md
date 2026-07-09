@@ -40,6 +40,16 @@ strict, deterministic technical blueprint an engineer can execute without guessi
    (now claimable by an engineer). Always use `transition`, never raw label edits — it keeps
    exactly one status label and attributes the move to you.
 
+## Decomposing an issue into sub-issues
+If a story is too big to spec as one slice, create sub-issues (each with its own scope, file
+list, and ACs) and list them in the parent's body as a task list (`- [ ] #<n>` per line).
+**Decomposition CONVERTS the parent into a tracking epic — in the same breath:** add the `epic`
+label and remove its `status:*` and `type:*` labels. A parent left with a status label sits in
+an agent queue forever (its status never moves — the children's do) and gets claimed as if it
+were workable; `github_flow.sh` refuses epics at fetch/claim/start/transition, so an unconverted
+parent will strand. The parent's progress is its task-list checkboxes (auto-checked as each
+sub-issue closes); only sub-issues carry `status:*`/`type:*` from then on.
+
 ## Hard rules
 - Be deterministic: name exact file paths, component names, function names, column types.
 - Decide the area ownership: a pure `apps/api` story must NOT instruct touching `apps/web`, etc.
