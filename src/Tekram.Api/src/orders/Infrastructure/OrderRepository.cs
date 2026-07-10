@@ -4,7 +4,7 @@ using Tekram.Api.src.orders.Application.Interfaces;
 using Tekram.Api.src.orders.Domain;
 using Tekram.Api.src.shared;
 
-public sealed class OrderRepository : IOrderRepository
+public class OrderRepository : IOrderRepository
 {
     private readonly TekramDbContext _db;
 
