@@ -3,9 +3,14 @@ namespace Tekram.Api.src.shared;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using FluentValidation;
-using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Tekram.Api.src.auth.Application.Interfaces;
+using Tekram.Api.src.auth.Infrastructure;
+// using Tekram.Api.src.restaurants.Application.Interfaces;   // #12/#13 scope
+// using Tekram.Api.src.restaurants.Infrastructure;            // #12/#13 scope
+// using Tekram.Api.src.orders.Application.Interfaces;         // #15-#17 scope
+// using Tekram.Api.src.orders.Infrastructure;                  // #15-#17 scope
 
 public static class ServiceCollectionExtensions
 {
@@ -18,43 +23,52 @@ public static class ServiceCollectionExtensions
         // ---- Redis ----
         var redisConnectionString = configuration.GetConnectionString("Redis")
                                     ?? "localhost:6379";
-        services.AddSingleton<IConnectionMultiplexer>(
-            ConnectionMultiplexer.Connect(new ConfigurationOptions
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+        {
+            try
             {
-                EndPoints = { redisConnectionString },
-                AbortOnConnectFail = false
-            }));
+                return ConnectionMultiplexer.Connect(new ConfigurationOptions
+                {
+                    EndPoints = { redisConnectionString },
+                    AbortOnConnectFail = false
+                });
+            }
+            catch
+            {
+                return null!;
+            }
+        });
 
         // ---- FluentValidation ----
         services.AddValidatorsFromAssemblyContaining<Program>();
 
         // ---- Auth infrastructure ----
-        // services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
-        // services.AddScoped<ITokenProvider, JwtTokenProvider>();
-        // services.AddScoped<IUserRepository, UserRepository>();
-        // services.AddScoped<IOtpRepository, OtpRepository>();
-        // services.AddSingleton<INotificationGateway, LoggingNotificationGateway>();
+        services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddScoped<ITokenProvider, JwtTokenProvider>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IOtpRepository, OtpRepository>();
+        services.AddSingleton<INotificationGateway, LoggingNotificationGateway>();
 
         // ---- Auth handlers ----
-        // services.AddScoped<auth.Application.Handlers.RegisterUserHandler>();
-        // services.AddScoped<auth.Application.Handlers.LoginHandler>();
-        // services.AddScoped<auth.Application.Handlers.VerifyOtpHandler>();
-        // services.AddScoped<auth.Application.Handlers.ResendOtpHandler>();
+        services.AddScoped<auth.Application.Handlers.RegisterUserHandler>();
+        services.AddScoped<auth.Application.Handlers.LoginHandler>();
+        services.AddScoped<auth.Application.Handlers.VerifyOtpHandler>();
+        services.AddScoped<auth.Application.Handlers.ResendOtpHandler>();
 
-        // ---- Restaurants infrastructure ----
+        // ---- Restaurants infrastructure (uncomment when #12 lands) ----
         // services.AddScoped<IRestaurantRepository, RestaurantRepository>();
         // services.AddScoped<IMenuRepository, MenuRepository>();
 
-        // ---- Restaurants handlers ----
+        // ---- Restaurants handlers (uncomment when #13 lands) ----
         // services.AddScoped<restaurants.Application.Handlers.SearchRestaurantsHandler>();
         // services.AddScoped<restaurants.Application.Handlers.GetMenuHandler>();
 
-        // ---- Orders infrastructure ----
+        // ---- Orders infrastructure (uncomment when #15-#17 land) ----
         // services.AddScoped<IOrderRepository, OrderRepository>();
         // services.AddScoped<ICouponRepository, CouponRepository>();
         // services.AddScoped<IMenuPricingReader, MenuPricingReader>();
 
-        // ---- Orders handlers ----
+        // ---- Orders handlers (uncomment when #16 lands) ----
         // services.AddScoped<orders.Application.Handlers.PlaceOrderHandler>();
 
         return services;
@@ -64,32 +78,19 @@ public static class ServiceCollectionExtensions
     {
         services.AddRateLimiter(options =>
         {
-            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-            // ---- Login: 5 attempts per 15 min per IP ----
-            options.AddPolicy("login", context =>
+            options.AddFixedWindowLimiter("login", config =>
             {
-                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                return RateLimitPartition.GetFixedWindowLimiter(ip, _ =>
-                    new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 5,
-                        Window = TimeSpan.FromMinutes(15),
-                        QueueLimit = 0
-                    });
+                config.PermitLimit = 5;
+                config.Window = TimeSpan.FromMinutes(15);
+                config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                config.QueueLimit = 0;
             });
-
-            // ---- OTP resend: 3 attempts per 15 min per user ----
-            options.AddPolicy("otp_resend", context =>
+            options.AddFixedWindowLimiter("otp_resend", config =>
             {
-                var userId = context.User.FindFirstValue("sub") ?? "anonymous";
-                return RateLimitPartition.GetFixedWindowLimiter(userId, _ =>
-                    new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = 3,
-                        Window = TimeSpan.FromMinutes(15),
-                        QueueLimit = 0
-                    });
+                config.PermitLimit = 3;
+                config.Window = TimeSpan.FromMinutes(15);
+                config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                config.QueueLimit = 0;
             });
         });
 
