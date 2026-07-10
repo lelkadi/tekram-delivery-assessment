@@ -17,6 +17,8 @@ deliverable.
 | [TD-006](#td-006--qa-gate-on-gemini-via-antigravity-third-family-independence) | QA gate on Gemini (antigravity) for third-family independence | **Superseded by TD-007** (2026-07-09) | — |
 | [TD-007](#td-007--qa-gate-on-claude-code--sonnet-high-effort-supersedes-td-006) | QA gate on claude-code / sonnet, high effort | Accepted | Verified third-family runtime appears with slack to migrate, or correlated QA/architect misses observed |
 | [TD-008](#td-008--qa-persists-a-black-box-e2e-suite-per-issue-one-fact-per-ac) | QA persists a black-box e2e suite per issue (one fact per AC) | Accepted | Suite runtime slows the gate materially, or P4 UI needs true browser e2e |
+| [TD-009](#td-009--qa-dual-gate-on-opencode--deepseek-v4-pro) | QA dual-gate on opencode / deepseek-v4-pro | Accepted | — |
+| [TD-010](#td-010--architect-review-dual-gate-on-opencode--gpt-55) | Architect-review dual-gate on opencode / GPT-5.5 | Accepted | Correlated architect misses observed, or GPT-5.5 regresses significantly vs Claude Opus |
 
 ---
 
@@ -277,3 +279,78 @@ actually run" check becomes mechanical: a `test(e2e)` commit must exist on the b
 
 **Revisit trigger.** Suite runtime slows the gate materially (→ split into a nightly run), or P4
 UI work needs true browser e2e (→ extend the location/convention, not this decision).
+
+---
+
+## TD-009 — QA dual-gate on opencode / deepseek-v4-pro
+
+**Status:** accepted
+**Date:** 2026-07-09
+
+**Context.** After TD-007 moved QA off the unverified antigravity runtime and onto
+claude-code/sonnet, QA shared a model family with the downstream reviewers (both on Claude).
+TD-008 mitigated this by shifting gate independence from model family to *method* (persistent
+e2e tests), but model-family diversity at the QA layer was still desirable — a second gate on
+an unrelated family would catch sonnet-specific blind spots.
+
+**Decision.** Add a second QA agent (`qa-opencode`) running on DeepSeek v4-pro via the opencode
+runtime — the same model family as the engineers, but operating as an **independent dual-gate**
+alongside the primary sonnet QA:
+
+- Both agents claim the same issue from `status:5-in-review` and run independently.
+- Each writes its own e2e tests under `tests/e2e/` (opencode enforces this as a hard
+  permission boundary; sonnet QA uses prose guidance).
+- **First PASS wins** — the first agent to pass transitions the issue to `status:7-qa-passed`.
+  Both must fail for the issue to go to `status:6-qa-failed`.
+
+The DeepSeek family overlap with engineers is acceptable because the gate's independence comes
+from *method* (black-box e2e tests vs in-process integration tests), not model family — the
+same principle established in TD-008.
+
+**Rejected alternative.** Adding a third family (e.g., OpenAI GPT via opencode) — deferred
+because DeepSeek v4-pro was already configured and available on the opencode runtime, needing
+no new provider setup.
+
+**Revisit trigger.** Evidence that the dual DeepSeek gates (engineer + QA) share correlated
+blind spots that a third-family gate would catch.
+
+---
+
+## TD-010 — Architect-review dual-gate on opencode / GPT-5.5
+
+**Status:** accepted
+**Date:** 2026-07-10
+
+**Context.** The architect-review is the final gate before `11-done` — the only role that merges
+PRs and closes issues. It currently runs on Claude Opus, the same model family as pm-verify
+(Opus) and the QA primary gate (sonnet). With no model-family diversity at this layer, a
+correlated blind spot across all three review gates could miss issues the engineers (DeepSeek)
+also missed — leaving the pipeline's last defense with no independent perspective.
+
+**Decision.** Add a second architect-review agent (`architect-review-opencode`) running on OpenAI
+GPT-5.5 via the opencode runtime. Both architect agents work as a **dual-gate** (parallel,
+first-accept-wins):
+- Both claim the same issue from `status:9-pm-verified` and review independently.
+- **Reject:** either may transition to `status:10-arch-rejected` (first reject wins).
+- **Accept:** first to finish merges the PR, transitions to `status:11-done`, and closes.
+  The other agent's merge attempt fails harmlessly (GitHub rejects already-merged PRs).
+- The existing `architect_review_instructions.md` is shared — same protocol, same verdict
+  format, same merge/close workflow.
+
+This completes three-family diversity across the review chain:
+- **DeepSeek** → engineers + architect-spec
+- **Anthropic Claude** → QA (primary) + pm-verify + architect-review (primary)
+- **OpenAI GPT-5.5** → architect-review (dual-gate)
+
+**Rejected alternatives.**
+- *Replace architect-review entirely with GPT-5.5:* loses the verified Claude Opus gate and
+  its track record across the assessment.
+- *Sequential review (Opus then GPT-5.5):* adds latency to the critical path without
+  corresponding safety benefit — if Opus already accepted, forcing a second review catches
+  only Opus-specific errors, not consensus errors (the dual-gate model catches both).
+- *Keep the single gate:* continued correlated risk at the final review layer — see
+  TD-007's revisit trigger ("correlated QA/architect misses observed"), now pre-emptively
+  addressed.
+
+**Revisit trigger.** Evidence of correlated misses between the two architect agents, or
+GPT-5.5 quality regression relative to Claude Opus on code review tasks.

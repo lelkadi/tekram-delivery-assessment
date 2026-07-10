@@ -186,7 +186,12 @@ agents:
     tools: ["Read", "Grep", "Glob", "Bash"]
     instructions_file: "pm_verify_instructions.md"
 
-  # ── Stage 7: Architect code review (accept/reject) ─────────────────────────
+  # ── Stage 7: Architect code review (accept/reject) — dual-gate ────────────
+  # DECISION (founder, 2026-07-10, TD-010): architect-review gets a dual-gate
+  # companion on opencode/GPT-5.5 for third-family independence in the final
+  # review layer. Both review the same issue independently; first ACCEPT wins
+  # (whoever merges first), any REJECT sends it back. Same instructions file,
+  # same protocol — only the runtime/model differs.
   architect-review:
     display_name: "Architect — Code Review"
     stage: "9-pm-verified -> {10-arch-rejected | 11-done}"
@@ -194,6 +199,20 @@ agents:
     claude_model_alias: "opus"
     tools: ["Read", "Grep", "Glob", "Bash"]
     instructions_file: "architect_review_instructions.md"
+
+  architect-review-opencode:
+    display_name: "Architect — Code Review (opencode/GPT-5.5)"
+    stage: "9-pm-verified -> {10-arch-rejected | 11-done}"
+    environment: "opencode"
+    opencode_model: "openai/gpt-5.5"
+    opencode_mode: "primary"
+    opencode_temperature: 0.15
+    opencode_options:
+      thinking:
+        type: enabled
+        reasoning_effort: high
+    instructions_file: "architect_review_instructions.md"
+    skills: ["github_flow"]
 
 # ── Workflow constants (consumed by github_flow.sh and human readers) ─────────
 workflow:

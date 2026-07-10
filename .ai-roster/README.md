@@ -20,7 +20,8 @@ priorities: [docs/00-project-management-plan.md](../docs/00-project-management-p
 | `web-engineer` | opencode / deepseek-v4-flash | **P4 bonus only** — implements a eng-lead brief in `web/**`, spun up only after all P0–P3 deliverables exist. |
 | `qa` | **claude-code / sonnet (effort: high)** | Code issues only: checks out the PR branch in its own worktree, writes a **black-box e2e suite from the issue's acceptance criteria** (`tests/e2e/<Module>/<Feature>Tests.cs`, one fact per AC, classes tagged `[Trait("issue","<n>")]` — committed and pushed onto the PR branch, PASS or FAIL), runs it plus the engineer's tests against the real lane stack, verdict `6-qa-failed` / `7-qa-passed`. Gate independence comes from **method** (persistent machine-checkable tests, decorrelated from the engineers' in-process style), not model family — see [technical-decisions.md](../docs/technical-decisions.md) TD-007/TD-008 (supersedes TD-006's Gemini/antigravity choice). |
 | `pm-verify` | claude-code / opus, **human-triggered** | The founder's gate: scores deliverables against [rubric-checklist.md](rubric-checklist.md) → `8-pm-rejected` / `9-pm-verified`. |
-| `architect-review` | claude-code / opus | Final review. Code: correctness + spec conformance. Docs: cross-document consistency (architecture ↔ schema ↔ DevOps must tell one story). Only stage allowed to close issues → `11-done`, and the only one allowed to merge. |
+| `architect-review` | claude-code / opus | Final review (primary). Code: correctness + spec conformance. Docs: cross-document consistency. Dual-gate with `architect-review-opencode`: first ACCEPT wins. |
+| `architect-review-opencode` | opencode / gpt-5.5 | Dual-gate companion to `architect-review` — same protocol on OpenAI GPT-5.5. Reviews diffs, architecture compliance, runs tests. First ACCEPT merges and closes. |
 
 Sync roster → runtimes: `npm run sync-agents` (emits `.claude/agents/*.md` and
 `.opencode/agents/*.md`, appending every file in `rules/` to every agent).
@@ -140,7 +141,7 @@ sometimes relevant, so it doesn't tax every other task:
   into sub-issues converts it: add `epic`, strip its `status:*`/`type:*` in the same edit.
 - Comments: one per handoff, posted on the **work issue** (never the epic); researcher/spec/QA
   comments use their exact greppable headings.
-- Only `architect-review` closes work issues; `pm-doc-intake` closes finished epics.
+- Only `architect-review`/`architect-review-opencode` close work issues (dual-gate: first ACCEPT wins); `pm-doc-intake` closes finished epics.
 - Env every agent needs: `GH_AGENT_ID=<role-id>` (worktree + claim identity — `GH_TOKEN` is
   self-sourced by `github_flow.sh`/`gh-env.sh` from the untracked repo-local credential file, no
   env setup needed), `MAX_LANES` (default 3).

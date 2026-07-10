@@ -10,10 +10,11 @@
 3. **Verification precedes publication.** Whoever dispatches a task also verifies its output
    (build, tests, a live spot-check) before that output goes anywhere public (push, PR, label
    change, comment). Never relay a worker's self-report as verified fact.
-4. **Merge/close authority is exclusive.** Only `architect-review` merges PRs and closes
-   `type:code` issues. Only `architect-review` or the drafter's reviewer (per the collapsed
-   pipeline) closes `type:doc` issues. `eng-lead` publishes (push + PR + label) but never
-   merges.
+4. **Merge/close authority is exclusive.** Only `architect-review` and
+   `architect-review-opencode` merge PRs and close `type:code` issues (dual-gate — first to
+   accept wins; either can reject). Only `architect-review` or the drafter's reviewer (per the
+   collapsed pipeline) closes `type:doc` issues. `eng-lead` publishes (push + PR + label) but
+   never merges.
 5. **No silent escalation.** If a brief can't be completed as written (missing spec detail,
    conflicting instruction), the receiving agent stops and reports back — it does not guess, and
    it does not widen its own scope to compensate.
