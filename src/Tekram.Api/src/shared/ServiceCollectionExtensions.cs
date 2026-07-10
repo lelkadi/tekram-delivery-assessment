@@ -5,6 +5,12 @@ using StackExchange.Redis;
 using FluentValidation;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Tekram.Api.src.auth.Application.Interfaces;
+using Tekram.Api.src.auth.Infrastructure;
+using Tekram.Api.src.restaurants.Application.Interfaces;
+using Tekram.Api.src.restaurants.Infrastructure;
+using Tekram.Api.src.orders.Application.Interfaces;
+using Tekram.Api.src.orders.Infrastructure;
 
 public static class ServiceCollectionExtensions
 {
@@ -28,33 +34,33 @@ public static class ServiceCollectionExtensions
         services.AddValidatorsFromAssemblyContaining<Program>();
 
         // ---- Auth infrastructure ----
-        // services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
-        // services.AddScoped<ITokenProvider, JwtTokenProvider>();
-        // services.AddScoped<IUserRepository, UserRepository>();
-        // services.AddScoped<IOtpRepository, OtpRepository>();
-        // services.AddSingleton<INotificationGateway, LoggingNotificationGateway>();
+        services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddScoped<ITokenProvider, JwtTokenProvider>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IOtpRepository, OtpRepository>();
+        services.AddSingleton<INotificationGateway, LoggingNotificationGateway>();
 
         // ---- Auth handlers ----
-        // services.AddScoped<auth.Application.Handlers.RegisterUserHandler>();
-        // services.AddScoped<auth.Application.Handlers.LoginHandler>();
-        // services.AddScoped<auth.Application.Handlers.VerifyOtpHandler>();
-        // services.AddScoped<auth.Application.Handlers.ResendOtpHandler>();
+        services.AddScoped<auth.Application.Handlers.RegisterUserHandler>();
+        services.AddScoped<auth.Application.Handlers.LoginHandler>();
+        services.AddScoped<auth.Application.Handlers.VerifyOtpHandler>();
+        services.AddScoped<auth.Application.Handlers.ResendOtpHandler>();
 
         // ---- Restaurants infrastructure ----
-        // services.AddScoped<IRestaurantRepository, RestaurantRepository>();
-        // services.AddScoped<IMenuRepository, MenuRepository>();
+        services.AddScoped<IRestaurantRepository, RestaurantRepository>();
+        services.AddScoped<IMenuRepository, MenuRepository>();
 
         // ---- Restaurants handlers ----
-        // services.AddScoped<restaurants.Application.Handlers.SearchRestaurantsHandler>();
-        // services.AddScoped<restaurants.Application.Handlers.GetMenuHandler>();
+        services.AddScoped<restaurants.Application.Handlers.SearchRestaurantsHandler>();
+        services.AddScoped<restaurants.Application.Handlers.GetMenuHandler>();
 
         // ---- Orders infrastructure ----
-        // services.AddScoped<IOrderRepository, OrderRepository>();
-        // services.AddScoped<ICouponRepository, CouponRepository>();
-        // services.AddScoped<IMenuPricingReader, MenuPricingReader>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<ICouponRepository, CouponRepository>();
+        services.AddScoped<IMenuPricingReader, MenuPricingReader>();
 
         // ---- Orders handlers ----
-        // services.AddScoped<orders.Application.Handlers.PlaceOrderHandler>();
+        services.AddScoped<orders.Application.Handlers.PlaceOrderHandler>();
 
         return services;
     }
@@ -99,7 +105,10 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddTekramOpenApi(this IServiceCollection services)
     {
-        services.AddSwaggerGen();
+        services.AddSwaggerGen(c =>
+        {
+            c.SwaggerDoc("v1", new() { Title = "Tekram API", Version = "v1" });
+        });
 
         return services;
     }
