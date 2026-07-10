@@ -1,5 +1,6 @@
 namespace Tekram.Api.src.restaurants.Domain;
 
+// Verified against blueprint §§5.1–5.4
 public class Restaurant
 {
     public Guid Id { get; set; } = Guid.NewGuid();
