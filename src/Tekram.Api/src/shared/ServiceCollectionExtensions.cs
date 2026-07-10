@@ -7,8 +7,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Tekram.Api.src.auth.Application.Interfaces;
 using Tekram.Api.src.auth.Infrastructure;
-// using Tekram.Api.src.restaurants.Application.Interfaces;   // #12/#13 scope
-// using Tekram.Api.src.restaurants.Infrastructure;            // #12/#13 scope
+using Tekram.Api.src.restaurants.Application.Interfaces;
+using Tekram.Api.src.restaurants.Infrastructure;
 // using Tekram.Api.src.orders.Application.Interfaces;         // #15-#17 scope
 // using Tekram.Api.src.orders.Infrastructure;                  // #15-#17 scope
 
@@ -55,13 +55,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<auth.Application.Handlers.VerifyOtpHandler>();
         services.AddScoped<auth.Application.Handlers.ResendOtpHandler>();
 
-        // ---- Restaurants infrastructure (uncomment when #12 lands) ----
-        // services.AddScoped<IRestaurantRepository, RestaurantRepository>();
-        // services.AddScoped<IMenuRepository, MenuRepository>();
+        // ---- Restaurants infrastructure ----
+        services.AddScoped<IRestaurantRepository, RestaurantRepository>();
+        services.AddScoped<IMenuRepository, MenuRepository>();
 
-        // ---- Restaurants handlers (uncomment when #13 lands) ----
-        // services.AddScoped<restaurants.Application.Handlers.SearchRestaurantsHandler>();
-        // services.AddScoped<restaurants.Application.Handlers.GetMenuHandler>();
+        // ---- Restaurants handlers ----
+        services.AddScoped<restaurants.Application.Handlers.SearchRestaurantsHandler>();
+        services.AddScoped<restaurants.Application.Handlers.GetMenuHandler>();
 
         // ---- Orders infrastructure (uncomment when #15-#17 land) ----
         // services.AddScoped<IOrderRepository, OrderRepository>();
