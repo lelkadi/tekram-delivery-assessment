@@ -20,6 +20,7 @@ public record MenuItemResponse(
     string? Description,
     decimal PriceUsd,
     bool IsAvailable,
+    int? StockCount,
     List<MenuCustomizationGroupResponse> CustomizationGroups
 );
 
