@@ -3,6 +3,7 @@ namespace Tekram.Api.src.shared;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using FluentValidation;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -63,19 +64,32 @@ public static class ServiceCollectionExtensions
     {
         services.AddRateLimiter(options =>
         {
-            options.AddFixedWindowLimiter("login", config =>
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // ---- Login: 5 attempts per 15 min per IP ----
+            options.AddPolicy("login", context =>
             {
-                config.PermitLimit = 5;
-                config.Window = TimeSpan.FromMinutes(15);
-                config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-                config.QueueLimit = 0;
+                var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter(ip, _ =>
+                    new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(15),
+                        QueueLimit = 0
+                    });
             });
-            options.AddFixedWindowLimiter("otp_resend", config =>
+
+            // ---- OTP resend: 3 attempts per 15 min per user ----
+            options.AddPolicy("otp_resend", context =>
             {
-                config.PermitLimit = 3;
-                config.Window = TimeSpan.FromMinutes(15);
-                config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-                config.QueueLimit = 0;
+                var userId = context.User.FindFirstValue("sub") ?? "anonymous";
+                return RateLimitPartition.GetFixedWindowLimiter(userId, _ =>
+                    new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 3,
+                        Window = TimeSpan.FromMinutes(15),
+                        QueueLimit = 0
+                    });
             });
         });
 
