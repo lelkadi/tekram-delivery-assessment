@@ -19,6 +19,9 @@ public class CouponRepository : ICouponRepository
         return await _db.Coupons.FirstOrDefaultAsync(c => c.Code == code, ct);
     }
 
+    // NOTE: IncrementUsageAsync is retained for ICouponRepository interface compliance
+    // but is no longer called by the handler — coupon atomicity is handled inline
+    // in PlaceOrderHandler via coupon.UsesCount++ within the order's SaveChangesAsync.
     public async Task IncrementUsageAsync(Coupon coupon, CancellationToken ct = default)
     {
         coupon.UsesCount++;
