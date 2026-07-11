@@ -58,6 +58,7 @@ public class GetMenuHandler
                     Description: item.Description,
                     PriceUsd: item.PriceUsd,
                     IsAvailable: item.StockCount is null || item.StockCount > 0,
+                    StockCount: item.StockCount,
                     CustomizationGroups: groupResponses
                 ));
             }
