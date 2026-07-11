@@ -1,6 +1,7 @@
 namespace Tekram.Api.src.shared;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 using StackExchange.Redis;
 using FluentValidation;
 using System.Threading.RateLimiting;
@@ -78,13 +79,8 @@ public static class ServiceCollectionExtensions
     {
         services.AddRateLimiter(options =>
         {
-            options.AddFixedWindowLimiter("login", config =>
-            {
-                config.PermitLimit = 5;
-                config.Window = TimeSpan.FromMinutes(15);
-                config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
-                config.QueueLimit = 0;
-            });
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
             options.AddFixedWindowLimiter("otp_resend", config =>
             {
                 config.PermitLimit = 3;

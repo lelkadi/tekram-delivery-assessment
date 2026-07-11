@@ -4,8 +4,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
+using StackExchange.Redis;
 using Tekram.Api.src.auth.Application.DTOs;
 using Tekram.Api.src.auth.Application.Handlers;
+using Tekram.Api.src.auth.Infrastructure;
 
 public static class AuthEndpoints
 {
@@ -30,12 +32,32 @@ public static class AuthEndpoints
         group.MapPost("/login", async (
             LoginRequest request,
             LoginHandler handler,
+            HttpContext httpContext,
+            IConnectionMultiplexer redis,
             CancellationToken ct) =>
         {
+            if (redis is not null)
+            {
+                var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var identifier = request.Identifier.Trim().ToLowerInvariant();
+                var allowed = await RedisRateLimiter.IsAllowedAsync(
+                    redis.GetDatabase(),
+                    $"ratelimit:login:{identifier}:{ip}",
+                    5,
+                    TimeSpan.FromMinutes(15));
+
+                if (!allowed)
+                {
+                    return Results.Problem(
+                        statusCode: StatusCodes.Status429TooManyRequests,
+                        title: "Too Many Requests",
+                        extensions: new Dictionary<string, object?> { ["error"] = "rate_limit_exceeded" });
+                }
+            }
+
             var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
-        .RequireRateLimiting("login")
         .WithName("Login")
         .WithTags("auth")
         .WithOpenApi();
