@@ -75,7 +75,7 @@ public class PlaceOrderHandler
                 foreach (var choice in item.CustomizationChoices)
                 {
                     if (!validGroupIds.Contains(choice.GroupId))
-                        throw new DomainException(422, ErrorCodes.InvalidCoupon,
+                        throw new DomainException(422, ErrorCodes.InvalidCustomization,
                             $"Customization group {choice.GroupId} is not valid for this menu item.");
 
                     var option = await _menuPricingReader.GetOptionAsync(choice.OptionId, ct);
@@ -85,7 +85,7 @@ public class PlaceOrderHandler
 
                     // Verify the option actually belongs to the claimed group
                     if (option.GroupId != choice.GroupId)
-                        throw new DomainException(422, ErrorCodes.InvalidCoupon,
+                        throw new DomainException(422, ErrorCodes.InvalidCustomization,
                             $"Option '{option.Name}' does not belong to group {choice.GroupId}.");
 
                     customizationMarkup += option.PriceModifierUsd;
