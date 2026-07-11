@@ -32,9 +32,8 @@ public class OrdersCouponSeedTests
 
         content.Should().Contain("WELCOME10");
         content.Should().Contain("FREEDELIVERY");
-        content.Should().Contain("SUMMER10");
-        content.Should().Contain("FREESHIP");
         content.Should().Contain("EXPIRED50");
+        content.Should().Contain("BIGSPENDER");
 
         // EXPIRED50 must be inactive
         content.Should().Contain("Active = false");
