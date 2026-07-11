@@ -60,27 +60,28 @@ public class SharedKernelTests
     }
 
     [SkippableFact]
-    public void AC2_PartialIndexFiltersReferenceRealPascalCaseColumns()
+    public void AC2_PartialIndexFiltersReferenceRealColumns()
     {
         Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set — no live lane stack to test against.");
 
         using var conn = OpenConnection(DatabaseUrl, out var skip);
         Skip.If(conn is null, skip);
 
-        // The regression: TekramDbContext.OnModelCreating's HasFilter(...) clauses previously used
-        // snake_case ("deleted_at IS NULL" / "consumed_at IS NULL") while EF Core (no naming
-        // convention configured) maps the columns as quoted PascalCase — Postgres 42703 at
-        // CREATE INDEX time. Assert the columns the filters must reference actually exist, with
-        // the exact case EF Core generates, on the real lane database.
-        AssertColumnExists(conn!, "auth", "otp_codes", "ConsumedAt");
-        AssertColumnExists(conn!, "restaurants", "restaurants", "DeletedAt");
-        AssertColumnExists(conn!, "restaurants", "menu_items", "DeletedAt");
+        // The regression: TekramDbContext.OnModelCreating's HasFilter(...) clauses referencing a
+        // column name the model doesn't actually produce — Postgres 42703 at CREATE INDEX time.
+        // The merged naming convention is snake_case, per docs/database-schema.md DDL
+        // (consumed_at L195, partial index "where consumed_at is null" L201). Assert the columns
+        // the filters must reference actually exist, with the exact case the spec mandates, on
+        // the real lane database. (Re-anchored from PascalCase to spec per #53.)
+        AssertColumnExists(conn!, "auth", "otp_codes", "consumed_at");
+        AssertColumnExists(conn!, "restaurants", "restaurants", "deleted_at");
+        AssertColumnExists(conn!, "restaurants", "menu_items", "deleted_at");
 
         // And assert the partial indexes themselves exist and their WHERE clause matches those
         // real column names (this is exactly what failed with a 42703 before the fix).
-        AssertIndexFilterContains(conn!, "auth", "otp_codes", "ConsumedAt");
-        AssertIndexFilterContains(conn!, "restaurants", "restaurants", "DeletedAt");
-        AssertIndexFilterContains(conn!, "restaurants", "menu_items", "DeletedAt");
+        AssertIndexFilterContains(conn!, "auth", "otp_codes", "consumed_at");
+        AssertIndexFilterContains(conn!, "restaurants", "restaurants", "deleted_at");
+        AssertIndexFilterContains(conn!, "restaurants", "menu_items", "deleted_at");
     }
 
     // ---- direct-Postgres read-only helpers (no EF, no src/** reference) ----
@@ -124,7 +125,8 @@ public class SharedKernelTests
         Assert.True(
             reader.Read(),
             $"Expected column {schema}.{table}.\"{column}\" to exist on the real lane database " +
-            "(TekramDbContext's model must produce this exact PascalCase column).");
+            "(TekramDbContext's model must produce this exact column name, snake_case per " +
+            "docs/database-schema.md).");
     }
 
     private static void AssertIndexFilterContains(Npgsql.NpgsqlConnection conn, string schema, string table, string columnInFilter)

@@ -241,7 +241,10 @@ public class AuthDomainTests
         HttpResponseMessage response;
         try
         {
-            response = await client.GetAsync("/");
+            // Probe /healthz — the spec'd liveness endpoint (architecture §10). No spec maps a
+            // bare GET /, so the API correctly 404s there; probing it asserted a route that was
+            // never supposed to exist (re-anchored per #53).
+            response = await client.GetAsync("/healthz");
         }
         catch (HttpRequestException ex)
         {
@@ -255,7 +258,7 @@ public class AuthDomainTests
             "an assembly-load or type-resolution failure in the auth domain layer.");
 
         response.IsSuccessStatusCode.Should().BeTrue(
-            "API should serve its root endpoint successfully — the auth domain " +
+            "API should serve /healthz successfully — the auth domain " +
             "files must compile and load without errors.");
     }
 
