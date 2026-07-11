@@ -33,6 +33,11 @@ public static class DbInitializer
             });
         }
 
+        // Persist backfill BEFORE the early-exit so existing DBs get the new coupons.
+        // (The bulk seed below is guarded by Restaurants.Any(), which returns early
+        //  on already-seeded databases — SaveChangesAsync never reached otherwise.)
+        await db.SaveChangesAsync();
+
         if (db.Restaurants.Any()) return; // Already seeded
 
         // ---- Restaurants ----
