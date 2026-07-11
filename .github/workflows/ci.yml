@@ -1,0 +1,159 @@
+# CI — the PR gate specified in docs/devops.md §2 (Part 5, issue #45).
+# Service containers mirror docker-compose.yml (same images, same health checks);
+# SDK is pinned by global.json so CI compiles with the same toolchain as every dev machine.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build · drift guard · integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tekram
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore Tekram.sln
+
+      - name: Build (warnings are errors)
+        run: dotnet build Tekram.sln --no-restore -warnaserror
+
+      # Fails when the EF model changed without a checked-in migration
+      # (docs/devops.md §2 — catches "works on my machine, breaks on deploy" pre-merge).
+      - name: Migration drift guard
+        run: |
+          dotnet tool install --global dotnet-ef --version '8.*'
+          dotnet ef migrations has-pending-model-changes --project src/Tekram.Api --no-build
+
+      - name: Integration tests
+        run: dotnet test Tekram.sln --no-build
+
+  e2e:
+    name: Black-box e2e (TD-008)
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tekram
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore and build
+        run: |
+          dotnet restore Tekram.sln
+          dotnet restore tests/e2e/Tekram.E2E.csproj
+          dotnet build Tekram.sln --no-restore
+          dotnet build tests/e2e/Tekram.E2E.csproj --no-restore
+
+      # The e2e project is deliberately outside Tekram.sln: it tests the API over HTTP
+      # like a real client, so CI boots the API first (it migrates + seeds on startup).
+      # --no-launch-profile: launchSettings.json would otherwise override ASPNETCORE_URLS.
+      - name: Boot API and wait for /healthz
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:5299
+          ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=tekram;Username=postgres;Password=postgres
+          ConnectionStrings__Redis: localhost:6379
+          EMAIL_MOCK: "true"
+          SMS_MOCK: "true"
+        run: |
+          nohup dotnet run --project src/Tekram.Api --no-build --no-launch-profile > api.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5299/healthz > /dev/null; then
+              echo "API healthy after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API never became healthy — boot log follows"
+          cat api.log
+          exit 1
+
+      - name: Black-box e2e tests
+        env:
+          E2E_BASE_URL: http://localhost:5299
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/tekram
+        run: dotnet test tests/e2e --no-build
+
+      - name: API boot log (on failure)
+        if: failure()
+        run: cat api.log || true
