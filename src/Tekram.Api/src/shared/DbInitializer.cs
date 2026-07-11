@@ -7,6 +7,28 @@ public static class DbInitializer
 {
     public static async Task SeedAsync(TekramDbContext db)
     {
+        // ---- Edge-case coupons (always seed, independent of restaurants) ----
+        if (!db.Coupons.Any())
+        {
+            var past = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var distantPast = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            db.Coupons.AddRange(
+                new Coupon
+                {
+                    Id = Guid.NewGuid(), Code = "EXPIRED50", DiscountType = "percent",
+                    DiscountValue = 50m, MinSubtotalUsd = 0m, MaxUses = null,
+                    UsesCount = 0, ValidFrom = distantPast, ValidUntil = past, Active = false
+                },
+                new Coupon
+                {
+                    Id = Guid.NewGuid(), Code = "BIGSPENDER", DiscountType = "percent",
+                    DiscountValue = 20m, MinSubtotalUsd = 100m, MaxUses = 5,
+                    UsesCount = 0, ValidFrom = distantPast,
+                    ValidUntil = new DateTime(2030, 12, 31, 23, 59, 59, DateTimeKind.Utc), Active = true
+                }
+            );
+        }
+
         if (db.Restaurants.Any()) return; // Already seeded
 
         // ---- Restaurants ----

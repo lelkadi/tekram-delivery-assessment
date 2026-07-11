@@ -10,8 +10,8 @@ using Tekram.Api.src.auth.Application.Interfaces;
 using Tekram.Api.src.auth.Infrastructure;
 using Tekram.Api.src.restaurants.Application.Interfaces;
 using Tekram.Api.src.restaurants.Infrastructure;
-// using Tekram.Api.src.orders.Application.Interfaces;         // #15-#17 scope
-// using Tekram.Api.src.orders.Infrastructure;                  // #15-#17 scope
+using Tekram.Api.src.orders.Application.Interfaces;         // #15-#17 scope
+using Tekram.Api.src.orders.Infrastructure;                  // #15-#17 scope
 
 public static class ServiceCollectionExtensions
 {
@@ -65,12 +65,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<restaurants.Application.Handlers.GetMenuHandler>();
 
         // ---- Orders infrastructure (uncomment when #15-#17 land) ----
-        // services.AddScoped<IOrderRepository, OrderRepository>();
-        // services.AddScoped<ICouponRepository, CouponRepository>();
-        // services.AddScoped<IMenuPricingReader, MenuPricingReader>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<ICouponRepository, CouponRepository>();
+        services.AddScoped<IMenuPricingReader, MenuPricingReader>();
 
         // ---- Orders handlers (uncomment when #16 lands) ----
-        // services.AddScoped<orders.Application.Handlers.PlaceOrderHandler>();
+        services.AddScoped<orders.Application.Handlers.PlaceOrderHandler>();
 
         return services;
     }
