@@ -58,7 +58,7 @@ public class OrdersHandlerTests
         // Step 9: coupon
         content.Should().Contain("GetByCodeAsync");
         content.Should().Contain("ApplyCoupon");
-        content.Should().Contain("IncrementUsageAsync");
+        content.Should().Contain("UsesCount");
         // Step 10: total
         content.Should().Contain("CalculateTotal");
         // Step 11: persist
@@ -87,7 +87,7 @@ public class OrdersHandlerTests
         content.Should().Contain("class CouponRepository");
         content.Should().Contain("ICouponRepository");
         content.Should().Contain("GetByCodeAsync");
-        content.Should().Contain("IncrementUsageAsync");
+        content.Should().Contain("UsesCount");
     }
 
     [Fact]

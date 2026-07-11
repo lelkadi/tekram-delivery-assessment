@@ -1,5 +1,6 @@
 namespace Tekram.Api.src.orders.Application.Handlers;
 
+using System.Linq;
 using System.Text.Json;
 using FluentValidation;
 using Tekram.Api.src.auth.Application.Interfaces;
@@ -66,13 +67,26 @@ public class PlaceOrderHandler
 
             if (item.CustomizationChoices?.Count > 0)
             {
+                // Validate that each claimed customization group belongs to this menu item
+                var groups = await _menuPricingReader.GetCustomizationGroupsAsync(item.MenuItemId, ct);
+                var validGroupIds = groups.Select(g => g.Id).ToHashSet();
+
                 customizationSnapshots = new List<object>();
                 foreach (var choice in item.CustomizationChoices)
                 {
+                    if (!validGroupIds.Contains(choice.GroupId))
+                        throw new DomainException(422, ErrorCodes.InvalidCoupon,
+                            $"Customization group {choice.GroupId} is not valid for this menu item.");
+
                     var option = await _menuPricingReader.GetOptionAsync(choice.OptionId, ct);
                     if (option is null)
                         throw new DomainException(409, ErrorCodes.ItemUnavailable,
                             $"Customization option {choice.OptionId} is not available.");
+
+                    // Verify the option actually belongs to the claimed group
+                    if (option.GroupId != choice.GroupId)
+                        throw new DomainException(422, ErrorCodes.InvalidCoupon,
+                            $"Option '{option.Name}' does not belong to group {choice.GroupId}.");
 
                     customizationMarkup += option.PriceModifierUsd;
 
@@ -132,7 +146,7 @@ public class PlaceOrderHandler
                     "Coupon does not apply to this order.");
 
             couponId = coupon.Id;
-            await _couponRepository.IncrementUsageAsync(coupon, ct);
+            coupon.UsesCount++;
         }
 
         var totalUsd = OrderPricingPolicy.CalculateTotal(subtotalUsd, deliveryFeeUsd, surchargeUsd,
