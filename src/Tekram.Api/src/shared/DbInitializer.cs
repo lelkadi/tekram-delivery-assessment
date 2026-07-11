@@ -7,6 +7,37 @@ public static class DbInitializer
 {
     public static async Task SeedAsync(TekramDbContext db)
     {
+        // ---- Backfill edge-case coupons on existing databases ----
+        // Guard each individually by Code so partial deploys still get backfilled
+        var distantPast = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var past = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        if (!db.Coupons.Any(c => c.Code == "EXPIRED50"))
+        {
+            db.Coupons.Add(new Coupon
+            {
+                Id = Guid.NewGuid(), Code = "EXPIRED50", DiscountType = "percent",
+                DiscountValue = 50m, MinSubtotalUsd = 0m, MaxUses = null,
+                UsesCount = 0, ValidFrom = distantPast, ValidUntil = past, Active = false
+            });
+        }
+
+        if (!db.Coupons.Any(c => c.Code == "BIGSPENDER"))
+        {
+            db.Coupons.Add(new Coupon
+            {
+                Id = Guid.NewGuid(), Code = "BIGSPENDER", DiscountType = "percent",
+                DiscountValue = 20m, MinSubtotalUsd = 100m, MaxUses = 5,
+                UsesCount = 0, ValidFrom = distantPast,
+                ValidUntil = new DateTime(2030, 12, 31, 23, 59, 59, DateTimeKind.Utc), Active = true
+            });
+        }
+
+        // Persist backfill BEFORE the early-exit so existing DBs get the new coupons.
+        // (The bulk seed below is guarded by Restaurants.Any(), which returns early
+        //  on already-seeded databases — SaveChangesAsync never reached otherwise.)
+        await db.SaveChangesAsync();
+
         if (db.Restaurants.Any()) return; // Already seeded
 
         // ---- Restaurants ----

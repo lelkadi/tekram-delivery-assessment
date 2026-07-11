@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Tekram.Api.src.auth.Presentation;
-// using Tekram.Api.src.orders.Presentation;        // #16 scope — uncomment when merged
+using Tekram.Api.src.orders.Presentation;        // #16 scope — uncomment when merged
 using Tekram.Api.src.restaurants.Presentation;
 using Tekram.Api.src.shared;
 
@@ -42,7 +42,7 @@ try
 
     app.MapAuthEndpoints();
     app.MapRestaurantEndpoints();
-    // app.MapOrderEndpoints();        // #16 scope — uncomment when merged
+    app.MapOrderEndpoints();        // #16 scope — uncomment when merged
 
     app.MapGet("/healthz", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
