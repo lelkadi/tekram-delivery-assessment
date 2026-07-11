@@ -1,143 +1,178 @@
 namespace Tekram.E2E.Orders;
 
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Tekram.Api.src.auth.Application.Interfaces;
+using Tekram.Api.src.auth.Domain;
+using Tekram.Api.src.shared;
 
 /// <summary>
-/// Structural verification for issue #16 (Part 2 Slice 3.2 — Orders:
-/// PlaceOrderHandler, infrastructure repositories, presentation endpoint).
-/// Verifies file existence and key implementation details against blueprint §§6.5–6.7.
+/// Black-box HTTP e2e tests for POST /api/food/orders (issue #16).
+/// Uses WebApplicationFactory against the lane PostgreSQL database.
+/// Verifies all acceptance criteria: 201, 401, 403, 422.
 /// </summary>
 [Trait("issue", "16")]
-public class OrdersHandlerTests
+public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
 {
-    private static readonly string RepoRoot = FindRepoRoot();
+    private readonly WebApplicationFactory<Program> _factory;
+    private HttpClient _client = null!;
+    private Guid _restaurantId;
+    private Guid _menuItemId;
 
-    private static string FindRepoRoot()
+    public OrdersHandlerTests(WebApplicationFactory<Program> factory)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Tekram.sln")))
-            dir = dir.Parent;
-        return dir?.FullName ?? throw new InvalidOperationException("Repo root not found");
-    }
-
-    private static string ReadAll(string path)
-    {
-        var full = Path.Combine(RepoRoot, path);
-        File.Exists(full).Should().BeTrue($"file must exist: {path}");
-        return File.ReadAllText(full);
-    }
-
-    // ── AC1: PlaceOrderHandler (SS6.5.1) — all 12 steps ──────────────
-
-    [Fact]
-    public void AC1_Handler_HasAllTwelveSteps()
-    {
-        var content = ReadAll("src/Tekram.Api/src/orders/Application/Handlers/PlaceOrderHandler.cs");
-
-        // Step 1: validation
-        content.Should().Contain("ValidateAndThrowAsync");
-        // Step 2: verification gate
-        content.Should().Contain("EmailVerified");
-        content.Should().Contain("PhoneVerified");
-        content.Should().Contain("VerificationRequired");
-        // Step 3: price parity
-        content.Should().Contain("GetItemForPricingAsync");
-        // Step 4: stock check
-        content.Should().Contain("StockCount");
-        content.Should().Contain("ItemUnavailable");
-        // Step 5: customization pricing
-        content.Should().Contain("CustomizationChoices");
-        content.Should().Contain("PriceModifierUsd");
-        // Step 6: subtotal
-        content.Should().Contain("subtotalUsd");
-        content.Should().Contain("effectiveUnitPrice * item.Quantity");
-        // Step 7: surcharge
-        content.Should().Contain("CalculateSmallOrderSurcharge");
-        // Step 8: delivery fee
-        content.Should().Contain("CalculateDeliveryFee");
-        // Step 9: coupon
-        content.Should().Contain("GetByCodeAsync");
-        content.Should().Contain("ApplyCoupon");
-        content.Should().Contain("IncrementUsageAsync");
-        // Step 10: total
-        content.Should().Contain("CalculateTotal");
-        // Step 11: persist
-        content.Should().Contain("AddAsync");
-        // Step 12: response
-        content.Should().Contain("new OrderResponse");
-        content.Should().Contain("BookingId:");
-    }
-
-    // ── AC2: Infrastructure repositories (SS6.6) ──────────────────────
-
-    [Fact]
-    public void AC2_OrderRepository_Exists()
-    {
-        var content = ReadAll("src/Tekram.Api/src/orders/Infrastructure/OrderRepository.cs");
-        content.Should().Contain("class OrderRepository");
-        content.Should().Contain("IOrderRepository");
-        content.Should().Contain("AddAsync");
-        content.Should().Contain("SaveChangesAsync");
-    }
-
-    [Fact]
-    public void AC2_CouponRepository_Exists()
-    {
-        var content = ReadAll("src/Tekram.Api/src/orders/Infrastructure/CouponRepository.cs");
-        content.Should().Contain("class CouponRepository");
-        content.Should().Contain("ICouponRepository");
-        content.Should().Contain("GetByCodeAsync");
-        content.Should().Contain("IncrementUsageAsync");
-    }
-
-    [Fact]
-    public void AC2_MenuPricingReader_Exists()
-    {
-        var content = ReadAll("src/Tekram.Api/src/orders/Infrastructure/MenuPricingReader.cs");
-        content.Should().Contain("class MenuPricingReader");
-        content.Should().Contain("IMenuPricingReader");
-        content.Should().Contain("GetItemForPricingAsync");
-        content.Should().Contain("GetCustomizationGroupsAsync");
-        content.Should().Contain("GetOptionAsync");
-    }
-
-    // ── AC3: OrderEndpoints (SS6.7.1) ────────────────────────────────
-
-    [Fact]
-    public void AC3_OrderEndpoints_HasCorrectStructure()
-    {
-        var content = ReadAll("src/Tekram.Api/src/orders/Presentation/OrderEndpoints.cs");
-        content.Should().Contain("MapGroup(\"/api/food/orders\")");
-        content.Should().Contain("MapPost");
-        content.Should().Contain("RequireAuthorization()");
-        content.Should().Contain("Results.Created");
-        content.Should().Contain("PlaceOrderHandler");
-        content.Should().Contain("ClaimsPrincipal");
-    }
-
-    // ── Cross-cutting ──────────────────────────────────────────────────
-
-    [Fact]
-    public void AllOrderHandlerFilesUseCorrectNamespace()
-    {
-        var dirs = new[]
+        _factory = factory.WithWebHostBuilder(builder =>
         {
-            "src/Tekram.Api/src/orders/Application/Handlers",
-            "src/Tekram.Api/src/orders/Infrastructure",
-            "src/Tekram.Api/src/orders/Presentation"
-        };
+            builder.UseSetting("ConnectionStrings:DefaultConnection",
+                Environment.GetEnvironmentVariable("E2E_DATABASE_URL")
+                ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+                ?? "Host=localhost;Port=5432;Database=tekram;Username=postgres;Password=postgres");
+            builder.UseSetting("EMAIL_MOCK", "true");
+            builder.UseSetting("SMS_MOCK", "true");
+        });
+    }
 
-        foreach (var dir in dirs)
-        {
-            var fullDir = Path.Combine(RepoRoot, dir);
-            if (!Directory.Exists(fullDir)) continue;
-            foreach (var file in Directory.GetFiles(fullDir, "*.cs"))
-            {
-                var content = File.ReadAllText(file);
-                if (string.IsNullOrWhiteSpace(content)) continue;
-                content.Should().Contain("namespace Tekram.Api.src.orders",
-                    $"file '{Path.GetFileName(file)}' must use orders module namespace");
-            }
-        }
+    public async Task InitializeAsync()
+    {
+        (_client, _, _) = await RegisterVerifiedUserAsync();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
+        _restaurantId = db.Restaurants.First(r => r.Status == "active" && r.DeletedAt == null).Id;
+        _menuItemId = db.MenuItems.First(m => m.RestaurantId == _restaurantId && m.DeletedAt == null
+            && (m.StockCount == null || m.StockCount > 0)).Id;
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    private async Task<(HttpClient Client, string Token, Guid UserId)> RegisterVerifiedUserAsync()
+    {
+        var client = _factory.CreateClient();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var email = $"e2e{suffix}@test.com";
+        var phone = $"+96170{Random.Shared.Next(10000, 99999)}";
+
+        // Register
+        var reg = await client.PostAsJsonAsync("/api/auth/register", new
+        { name = "E2E User", email, phone, password = "Password1", role = "customer" });
+        reg.EnsureSuccessStatusCode();
+        var auth = await reg.Content.ReadFromJsonAsync<JsonElement>();
+        var token = auth.GetProperty("token").GetString()!;
+        var userId = auth.GetProperty("id").GetGuid();
+
+        // Insert known OTP codes directly into DB
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+        var hash = hasher.Hash("123456");
+        db.OtpCodes.Add(new OtpCode { Id = Guid.NewGuid(), UserId = userId, Channel = "email", CodeHash = hash, ExpiresAt = DateTime.UtcNow.AddMinutes(10), CreatedAt = DateTime.UtcNow });
+        db.OtpCodes.Add(new OtpCode { Id = Guid.NewGuid(), UserId = userId, Channel = "phone", CodeHash = hash, ExpiresAt = DateTime.UtcNow.AddMinutes(10), CreatedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+
+        // Verify both channels
+        var regClient = _factory.CreateClient();
+        regClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        await regClient.PostAsJsonAsync("/api/auth/verify/email", new { code = "123456" });
+        await regClient.PostAsJsonAsync("/api/auth/verify/phone", new { code = "123456" });
+
+        // Re-login
+        var login = await client.PostAsJsonAsync("/api/auth/login", new { identifier = email, password = "Password1" });
+        login.EnsureSuccessStatusCode();
+        var loginAuth = await login.Content.ReadFromJsonAsync<JsonElement>();
+        var verifiedToken = loginAuth.GetProperty("token").GetString()!;
+
+        var authClient = _factory.CreateClient();
+        authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", verifiedToken);
+        return (authClient, verifiedToken, userId);
+    }
+
+    private object OrderBody(Guid? itemId = null, int qty = 1, string? coupon = null) => new
+    {
+        restaurantId = _restaurantId,
+        items = new[] { new { menuItemId = itemId ?? _menuItemId, quantity = qty, customizationChoices = Array.Empty<object>() } },
+        deliveryAddress = "123 Test St",
+        paymentMethod = "COD",
+        couponCode = coupon
+    };
+
+    // ── AC: 201 on valid order ──────────────────────────────────────────
+
+    [Fact]
+    public async Task AC1_PlaceOrder_ValidRequest_Returns201()
+    {
+        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody());
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("bookingId").GetGuid().Should().NotBeEmpty();
+        body.GetProperty("status").GetString().Should().Be("pending");
+        body.GetProperty("totals").GetProperty("subtotalUsd").GetDecimal().Should().BeGreaterThan(0);
+        body.GetProperty("createdAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    // ── AC: 401 without auth ────────────────────────────────────────────
+
+    [Fact]
+    public async Task AC2_PlaceOrder_NoAuth_Returns401()
+    {
+        var anon = _factory.CreateClient();
+        var response = await anon.PostAsJsonAsync("/api/food/orders", OrderBody());
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ── AC: 403 when user not verified ──────────────────────────────────
+
+    [Fact]
+    public async Task AC3_PlaceOrder_UnverifiedUser_Returns403()
+    {
+        var client = _factory.CreateClient();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var reg = await client.PostAsJsonAsync("/api/auth/register", new
+        { name = "UV", email = $"uv{suffix}@t.com", phone = $"+96170{Random.Shared.Next(10000, 99999)}", password = "Password1", role = "customer" });
+        reg.EnsureSuccessStatusCode();
+        var token = (await reg.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
+
+        var uvClient = _factory.CreateClient();
+        uvClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await uvClient.PostAsJsonAsync("/api/food/orders", OrderBody());
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString().Should().Be("verification_required");
+    }
+
+    // ── AC: 422 when coupon invalid ─────────────────────────────────────
+
+    [Fact]
+    public async Task AC4_PlaceOrder_InvalidCoupon_Returns422()
+    {
+        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody(coupon: "NONEXISTENT"));
+        response.StatusCode.Should().Be((HttpStatusCode)422);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString().Should().Be("invalid_coupon");
+    }
+
+    // ── AC: Valid coupon applies discount ────────────────────────────────
+
+    [Fact]
+    public async Task AC5_PlaceOrder_ValidCoupon_AppliesDiscount()
+    {
+        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody(qty: 2, coupon: "WELCOME10"));
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var totals = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("totals");
+        totals.GetProperty("discountUsd").GetDecimal().Should().BeGreaterThan(0);
+    }
+
+    // ── AC: 409 when item unavailable ────────────────────────────────────
+
+    [Fact]
+    public async Task AC6_PlaceOrder_NonExistentItem_Returns409()
+    {
+        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody(itemId: Guid.NewGuid()));
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString().Should().Be("item_unavailable");
     }
 }
