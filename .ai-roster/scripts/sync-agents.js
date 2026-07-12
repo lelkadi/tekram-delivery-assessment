@@ -5,7 +5,7 @@
 //   SOURCE:  .ai-roster/team.yaml  +  .ai-roster/<role>_instructions.md
 //   EMIT (environment: claude-code):  .claude/agents/<id>.md    (true subagents, fresh context)
 //   EMIT (environment: opencode):     .opencode/agents/<id>.md  (markdown + YAML frontmatter)
-//   EMIT (environment: antigravity):  .agents/agents/<id>/agent.json
+//   EMIT (environment: antigravity):  .agents/agents/<id>/agent.md
 //
 // Why not claude.json/customCommands? Claude Code never reads that; and slash commands run in the
 // CURRENT conversation (no fresh context), violating the "independent subagent" rule. Subagents
@@ -171,29 +171,71 @@ function emitOpencodeAgent(id, cfg, body, team) {
   console.log(`[opencode] ${cfg.display_name} -> .opencode/agents/${id}.md (model: ${model})`);
 }
 
+// agy model display names carry the thinking level as a parenthesized suffix:
+// "Gemini 3.5 Flash (High)". team.yaml keeps `model` (base name) and `thinking`
+// separate so either can change independently; a model already carrying "(...)"
+// is passed through untouched. The composed name is checked against live
+// `agy models` output — a name agy doesn't know fails silently at runtime.
+function composeAgyModel(id, cfg) {
+  if (!cfg.model || String(cfg.model).startsWith('TODO-VERIFY')) {
+    return cfg.model || 'TODO-VERIFY-run-agy-models';
+  }
+  let model = String(cfg.model).trim();
+  if (!/\([^)]+\)\s*$/.test(model) && cfg.thinking) {
+    const level = String(cfg.thinking).trim();
+    model += ` (${level.charAt(0).toUpperCase()}${level.slice(1).toLowerCase()})`;
+  }
+  try {
+    const out = require('child_process').execSync('agy models', {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000,
+    });
+    const menu = out.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!menu.includes(model)) {
+      console.warn(`[Antigravity] WARNING: ${id} model "${model}" is not in \`agy models\` output — it will fail silently at runtime. Valid: ${menu.filter((m) => m !== 'Available models:').join(' | ')}`);
+    }
+  } catch (e) {
+    console.warn(`[Antigravity] WARNING: could not run \`agy models\` to validate "${model}" (${e.message.split('\n')[0]}).`);
+  }
+  return model;
+}
+
 function emitAntigravityAgent(id, cfg, body) {
-  const dir = path.join(AGY_AGENTS_DIR, id);
-  ensureDirSync(dir);
+  ensureDirSync(AGY_AGENTS_DIR);
   if (!cfg.model || String(cfg.model).startsWith('TODO-VERIFY')) {
     console.warn(`[Antigravity] WARNING: ${id} model is "${cfg.model}". Verify against Antigravity's live model menu before use — a wrong id fails silently at runtime.`);
   }
-  // Antigravity's real permission schema was never verified against live docs (unlike opencode's
-  // `permission.edit`, researched and confirmed) — same TODO-VERIFY caveat as `model` above. This
-  // field is carried through so a future antigravity agent isn't silently unscoped, but it is NOT
-  // confirmed to mechanically restrict writes until checked against Antigravity's real config.
   if (cfg.write_scope && cfg.write_scope.length) {
     console.warn(`[Antigravity] WARNING: ${id} write_scope is informational only — TODO-VERIFY against Antigravity's real permission schema before trusting it to restrict writes.`);
   }
-  const agyConfig = {
-    name: cfg.display_name,
-    model: cfg.model || 'TODO-VERIFY-antigravity-model',
-    thinking: cfg.thinking || 'low',
-    system_instruction: body,
-    skills: cfg.skills || [],
-    ...(cfg.write_scope ? { write_scope_TODO_VERIFY: cfg.write_scope } : {}),
+  // Format verified against agy 1.1.1 itself: the /agents panel documents
+  // `{workspace}/.agents/agents/{agent_name}/agent.md` (lowercase agent.md — not agent.json,
+  // not AGENT.md, not flat `<id>.md`). Model must be a display name from `agy models`;
+  // agy encodes the thinking level in that name ("Gemini 3.5 Flash (High)"), so team.yaml
+  // keeps model and thinking as separate knobs and we compose the display name here.
+  // NOTE: bare `agy agents` lists only GLOBAL agents — workspace agents show only in the
+  // interactive /agents panel, and `--agent <name>` silently falls back to default.
+  const model = composeAgyModel(id, cfg);
+  const frontmatterObj = {
+    name: id,
+    description: cfg.display_name,
+    model,
   };
-  fs.writeFileSync(path.join(dir, 'agent.json'), JSON.stringify(agyConfig, null, 2));
-  console.log(`[Antigravity] ${cfg.display_name} -> .agents/agents/${id}/agent.json (model: ${agyConfig.model})`);
+  const frontmatter = `---\n${yaml.dump(frontmatterObj, { lineWidth: -1 })}---\n\n`;
+
+  // Clean up stale layouts from previous (wrong) emit formats.
+  const oldFlatFile = path.join(AGY_AGENTS_DIR, `${id}.md`);
+  if (fs.existsSync(oldFlatFile)) {
+    fs.rmSync(oldFlatFile, { force: true });
+  }
+  const dir = path.join(AGY_AGENTS_DIR, id);
+  const oldJson = path.join(dir, 'agent.json');
+  if (fs.existsSync(oldJson)) {
+    fs.rmSync(oldJson, { force: true });
+  }
+
+  ensureDirSync(dir);
+  fs.writeFileSync(path.join(dir, 'agent.md'), frontmatter + body);
+  console.log(`[Antigravity] ${cfg.display_name} -> .agents/agents/${id}/agent.md (model: ${model})`);
 }
 
 function syncAgents() {
@@ -220,7 +262,7 @@ function syncAgents() {
   console.log(`\nDone. ${claude} Claude Code subagent(s), ${opencode} opencode agent(s), ${antigravity} Antigravity agent(s).`);
   console.log('Claude Code: invoke via the Agent tool with subagent_type: <id>.');
   console.log('opencode: agents available under .opencode/agents/<id>.md (deepseek provider in opencode.json).');
-  console.log('Antigravity: agents available under .agents/agents/<id>/.');
+  console.log('Antigravity: agents available under .agents/agents/<id>/agent.md (verify with `agy agents`).');
 }
 
 try {
