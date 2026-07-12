@@ -1,6 +1,7 @@
 namespace Tekram.Api.src.orders.Application.Handlers;
 
 using FluentValidation;
+using Tekram.Api.src.auth.Application.Interfaces;
 using Tekram.Api.src.orders.Application.DTOs;
 using Tekram.Api.src.orders.Application.Interfaces;
 using Tekram.Api.src.orders.Application.Validators;
@@ -13,23 +14,31 @@ public sealed class PlaceOrderHandler
     private readonly ICouponRepository _couponRepository;
     private readonly IMenuPricingReader _menuPricingReader;
     private readonly PlaceOrderRequestValidator _validator;
+    private readonly IUserRepository _userRepository;
 
     public PlaceOrderHandler(
         IOrderRepository orderRepository,
         ICouponRepository couponRepository,
         IMenuPricingReader menuPricingReader,
-        PlaceOrderRequestValidator validator)
+        PlaceOrderRequestValidator validator,
+        IUserRepository userRepository)
     {
         _orderRepository = orderRepository;
         _couponRepository = couponRepository;
         _menuPricingReader = menuPricingReader;
         _validator = validator;
+        _userRepository = userRepository;
     }
 
     public async Task<OrderResponse> HandleAsync(Guid userId, PlaceOrderRequest request, CancellationToken ct)
     {
         // Validate
         await _validator.ValidateAndThrowAsync(request, ct);
+
+        // Check user verification
+        var user = await _userRepository.GetByIdAsync(userId, ct);
+        if (user == null || !user.EmailVerified || !user.PhoneVerified)
+            throw new DomainException(403, ErrorCodes.VerificationRequired, "User must be verified to place an order.");
 
         // Calculate subtotal from items
         decimal subtotal = 0m;
@@ -39,10 +48,10 @@ public sealed class PlaceOrderHandler
         {
             var menuItem = await _menuPricingReader.GetItemForPricingAsync(itemReq.MenuItemId, ct);
             if (menuItem == null)
-                throw new DomainException(400, ErrorCodes.ItemUnavailable, $"Menu item {itemReq.MenuItemId} is not available.");
+                throw new DomainException(409, ErrorCodes.ItemUnavailable, $"Menu item {itemReq.MenuItemId} is not available.");
 
             if (menuItem.StockCount.HasValue && menuItem.StockCount < itemReq.Quantity)
-                throw new DomainException(400, ErrorCodes.ItemUnavailable, $"Insufficient stock for '{menuItem.Name}'.");
+                throw new DomainException(409, ErrorCodes.ItemUnavailable, $"Insufficient stock for '{menuItem.Name}'.");
 
             decimal unitPrice = menuItem.PriceUsd;
 
@@ -79,19 +88,19 @@ public sealed class PlaceOrderHandler
         {
             var coupon = await _couponRepository.GetByCodeAsync(request.CouponCode, ct);
             if (coupon == null)
-                throw new DomainException(400, ErrorCodes.InvalidCoupon, "Invalid or inactive coupon code.");
+                throw new DomainException(422, ErrorCodes.InvalidCoupon, "Invalid or inactive coupon code.");
 
             if (coupon.ValidUntil < DateTime.UtcNow)
-                throw new DomainException(400, ErrorCodes.InvalidCoupon, "Coupon has expired.");
+                throw new DomainException(422, ErrorCodes.InvalidCoupon, "Coupon has expired.");
 
             if (coupon.ValidFrom > DateTime.UtcNow)
-                throw new DomainException(400, ErrorCodes.InvalidCoupon, "Coupon is not yet valid.");
+                throw new DomainException(422, ErrorCodes.InvalidCoupon, "Coupon is not yet valid.");
 
             if (coupon.MaxUses.HasValue && coupon.UsesCount >= coupon.MaxUses.Value)
-                throw new DomainException(400, ErrorCodes.InvalidCoupon, "Coupon usage limit reached.");
+                throw new DomainException(422, ErrorCodes.InvalidCoupon, "Coupon usage limit reached.");
 
             if (subtotal < coupon.MinSubtotalUsd)
-                throw new DomainException(400, ErrorCodes.InvalidCoupon, $"Minimum subtotal of ${coupon.MinSubtotalUsd:F2} required for this coupon.");
+                throw new DomainException(422, ErrorCodes.InvalidCoupon, $"Minimum subtotal of ${coupon.MinSubtotalUsd:F2} required for this coupon.");
 
             discount = OrderPricingPolicy.ApplyCoupon(subtotal, coupon);
             couponId = coupon.Id;

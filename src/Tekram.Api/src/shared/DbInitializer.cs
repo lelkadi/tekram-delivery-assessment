@@ -33,6 +33,18 @@ public static class DbInitializer
             });
         }
 
+        if (!db.Coupons.Any(c => c.Code == "SUMMER10"))
+        {
+            var summerStart = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+            var summerEnd = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+            db.Coupons.Add(new Coupon
+            {
+                Id = Guid.NewGuid(), Code = "SUMMER10", DiscountType = "percent",
+                DiscountValue = 10m, MinSubtotalUsd = 10m, MaxUses = 200,
+                UsesCount = 0, ValidFrom = summerStart, ValidUntil = summerEnd, Active = true
+            });
+        }
+
         // Persist backfill BEFORE the early-exit so existing DBs get the new coupons.
         // (The bulk seed below is guarded by Restaurants.Any(), which returns early
         //  on already-seeded databases — SaveChangesAsync never reached otherwise.)
@@ -691,6 +703,13 @@ public static class DbInitializer
                 Id = Guid.NewGuid(),                 Code = "FREEDELIVERY", DiscountType = "fixed",
                 DiscountValue = 1.50m, MinSubtotalUsd = 5m, MaxUses = 500,
                 UsesCount = 0, ValidFrom = now.AddDays(-30), ValidUntil = now.AddDays(30), Active = true
+            },
+            new Coupon
+            {
+                Id = Guid.NewGuid(),                 Code = "SUMMER10", DiscountType = "percent",
+                DiscountValue = 10m, MinSubtotalUsd = 10m, MaxUses = 200,
+                UsesCount = 0, ValidFrom = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                ValidUntil = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc), Active = true
             }
         );
 
