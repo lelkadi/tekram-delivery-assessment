@@ -214,6 +214,22 @@ agents:
     instructions_file: "architect_review_instructions.md"
     skills: ["github_flow"]
 
+  # ── Stage 7: Architect code review — antigravity/Gemini gate (TD-011) ─────
+  # DECISION (founder, 2026-07-12, TD-011): architect-review gets a third gate on
+  # antigravity/Gemini 3.5 Flash for runtime diversity in the final review layer.
+  # Same instructions file, same protocol — only the runtime/model differs.
+  # NOTE: agy takes display names from `agy models` output, not API ids. The thinking
+  # level is a suffix of that name ("... (High)"); sync-agents composes it from the
+  # separate `model` + `thinking` fields below and validates against `agy models`.
+  architect-review-antigravity:
+    display_name: "Architect — Code Review (Antigravity/Gemini 3.5 Flash)"
+    stage: "9-pm-verified -> {10-arch-rejected | 11-done}"
+    environment: "antigravity"
+    model: "Gemini 3.5 Flash"
+    thinking: "high"
+    instructions_file: "architect_review_instructions.md"
+    skills: ["github_flow"]
+
 # ── Workflow constants (consumed by github_flow.sh and human readers) ─────────
 workflow:
   repo: "lelkadi/tekram-delivery-assessment"
