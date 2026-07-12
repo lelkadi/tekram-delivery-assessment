@@ -30,7 +30,15 @@ public class OrderIntegrationTests : IClassFixture<CustomWebApplicationFactory>,
         var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
         var r = db.Restaurants.First(r => r.Status == "active" && r.DeletedAt == null);
         _restaurantId = r.Id;
-        var m = db.MenuItems.First(m => m.RestaurantId == _restaurantId && m.DeletedAt == null && (m.StockCount == null || m.StockCount > 0));
+        // Deterministic pick: highest-priced eligible item (tiebreak by Id) so qty=2 reliably
+        // clears WELCOME10's $10 MinSubtotalUsd across every seeded restaurant (see DbInitializer.cs) —
+        // an unordered .First() previously let Postgres return any matching row, sometimes a
+        // cheap item that made PlaceOrder_ValidCoupon_AppliesDiscount flaky/red.
+        var m = db.MenuItems
+            .Where(m => m.RestaurantId == _restaurantId && m.DeletedAt == null && (m.StockCount == null || m.StockCount > 0))
+            .OrderByDescending(m => m.PriceUsd)
+            .ThenBy(m => m.Id)
+            .First();
         _menuItemId = m.Id;
     }
 
