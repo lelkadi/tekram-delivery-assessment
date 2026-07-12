@@ -31,8 +31,6 @@ public class OrderPlacementTests : IDisposable
         }
     }
 
-    private static bool ShouldSkip() => BaseUrl is null;
-
     private static async Task<string> GetVerifiedTokenAsync()
     {
         if (_cachedToken is not null) return _cachedToken;
@@ -107,10 +105,10 @@ public class OrderPlacementTests : IDisposable
     // SUCCESSFUL ORDER PLACEMENT
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC1_SuccessfulOrder_NoCoupon_Returns201()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -138,10 +136,10 @@ public class OrderPlacementTests : IDisposable
         body.GetProperty("createdAt").ValueKind.Should().Be(JsonValueKind.String);
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC2_SuccessfulOrder_PercentCoupon_WELCOME10()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -166,10 +164,10 @@ public class OrderPlacementTests : IDisposable
         discount.Should().BeGreaterThan(0, "WELCOME10 should apply a 10% discount");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC3_SuccessfulOrder_FixedCoupon_FREEDELIVERY()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -194,10 +192,10 @@ public class OrderPlacementTests : IDisposable
             "FREEDELIVERY should discount exactly the delivery fee");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC4_SmallOrderSurcharge_AppliedWhenBelowMOV()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         // Need a cheap item (below $7.00 MOV)
         var client = AuthenticatedClient();
@@ -244,10 +242,10 @@ public class OrderPlacementTests : IDisposable
             "subtotal below $7.00 MOV should trigger $1.00 surcharge");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC5_NoSurchargeAboveMOV()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -275,10 +273,10 @@ public class OrderPlacementTests : IDisposable
     // VERIFICATION GATE
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC6_UnverifiedEmailOnly_Returns403()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         // Register, verify phone only, leave email unverified — requires mock OTP access
         // For now, verify the error code behavior when unverified
@@ -324,10 +322,10 @@ public class OrderPlacementTests : IDisposable
     // STOCK VALIDATION
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC7_ItemOutOfStock_Returns409()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -353,10 +351,10 @@ public class OrderPlacementTests : IDisposable
     // COUPON VALIDATION
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC8_InvalidCoupon_Returns422()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -383,10 +381,10 @@ public class OrderPlacementTests : IDisposable
     // INPUT VALIDATION
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC9_EmptyItems_Returns422()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, _, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -408,10 +406,10 @@ public class OrderPlacementTests : IDisposable
         body.GetProperty("error").GetString().Should().Be("validation_failed");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC10_MissingDeliveryAddress_Returns422()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -433,10 +431,10 @@ public class OrderPlacementTests : IDisposable
         body.GetProperty("error").GetString().Should().Be("validation_failed");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC11_InvalidPaymentMethod_Returns422()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
@@ -462,10 +460,10 @@ public class OrderPlacementTests : IDisposable
     // AUTH
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC12_NoJWT_Returns401()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
         var payload = new
@@ -487,10 +485,10 @@ public class OrderPlacementTests : IDisposable
     // DELIVERY FEE
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public void AC13_DeliveryFee_Always_1_50()
     {
-        Skip.If(ShouldSkip(), "E2E_BASE_URL is not set");
+        
 
         var client = AuthenticatedClient();
         var (restaurantId, menuItemId, _) = GetFirstMenuItemAsync().GetAwaiter().GetResult();
