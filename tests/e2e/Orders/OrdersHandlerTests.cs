@@ -43,8 +43,16 @@ public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>,
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
         _restaurantId = db.Restaurants.First(r => r.Status == "active" && r.DeletedAt == null).Id;
-        _menuItemId = db.MenuItems.First(m => m.RestaurantId == _restaurantId && m.DeletedAt == null
-            && (m.StockCount == null || m.StockCount > 0)).Id;
+        // Deterministic pick: highest-priced eligible item (tiebreak by Id) so qty=2 reliably
+        // clears WELCOME10's $10 MinSubtotalUsd across every seeded restaurant (see DbInitializer.cs) —
+        // an unordered .First() previously let Postgres return any matching row, sometimes a cheap
+        // item that made AC5_PlaceOrder_ValidCoupon_AppliesDiscount flaky/red (issue #16).
+        _menuItemId = db.MenuItems
+            .Where(m => m.RestaurantId == _restaurantId && m.DeletedAt == null
+                && (m.StockCount == null || m.StockCount > 0))
+            .OrderByDescending(m => m.PriceUsd)
+            .ThenBy(m => m.Id)
+            .First().Id;
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
