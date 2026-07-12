@@ -31,74 +31,74 @@ public class RestaurantEndpointTests
     // ====================================================================
 
     [SkippableFact]
-    public void AC1_DefaultBrowse_Returns200_Envelope()
+    public async Task AC1_DefaultBrowse_Returns200_Envelope()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants").GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var json = await GetJson(response);
         json.GetProperty("data").ValueKind.Should().Be(JsonValueKind.Array);
         json.GetProperty("pagination").GetProperty("currentPage").GetInt32().Should().Be(1);
         json.GetProperty("pagination").GetProperty("totalItems").GetInt32().Should().BeGreaterThan(0);
     }
 
     [SkippableFact]
-    public void AC1_RatingDescending_DefaultSort()
+    public async Task AC1_RatingDescending_DefaultSort()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants");
+        var json = await GetJson(response);
         var ratings = json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("rating").GetDecimal()).ToList();
         ratings.Should().BeInDescendingOrder("default sort is rating descending");
     }
 
     [SkippableFact]
-    public void AC1_Search_ILIKE_CaseInsensitivePartial()
+    public async Task AC1_Search_ILIKE_CaseInsensitivePartial()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants?search=sushi").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?search=sushi");
+        var json = await GetJson(response);
         var names = json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("name").GetString()).ToList();
         names.Should().Contain(n => n!.Contains("Sushi", StringComparison.OrdinalIgnoreCase));
     }
 
     [SkippableFact]
-    public void AC1_CuisineFilter_ExactMatch()
+    public async Task AC1_CuisineFilter_ExactMatch()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants?cuisine=Italian").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?cuisine=Italian");
+        var json = await GetJson(response);
         var data = json.GetProperty("data").EnumerateArray().ToList();
         data.Should().NotBeEmpty();
         data.Should().OnlyContain(r => r.GetProperty("cuisine").GetString() == "Italian");
     }
 
     [SkippableFact]
-    public void AC1_PriceTier_SnakeCase_FiltersCorrectly()
+    public async Task AC1_PriceTier_SnakeCase_FiltersCorrectly()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
         // price_tier=2 (snake_case) — the documented API contract
-        var response = client.GetAsync("/api/food/restaurants?price_tier=2").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?price_tier=2");
+        var json = await GetJson(response);
         var data = json.GetProperty("data").EnumerateArray().ToList();
         data.Should().NotBeEmpty("there must be restaurants with price tier 2");
         data.Should().OnlyContain(r => r.GetProperty("priceTier").GetInt32() == 2);
     }
 
     [SkippableFact]
-    public void AC1_CombinedFilters_AndLogic()
+    public async Task AC1_CombinedFilters_AndLogic()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants?search=zen&cuisine=Japanese").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?search=zen&cuisine=Japanese");
+        var json = await GetJson(response);
         var data = json.GetProperty("data").EnumerateArray().ToList();
         data.Should().NotBeEmpty();
         data.Should().OnlyContain(r => r.GetProperty("name").GetString()!.Contains("Zen"));
@@ -109,18 +109,18 @@ public class RestaurantEndpointTests
     // ====================================================================
 
     [SkippableFact]
-    public void AC2_Pagination_NoOverlapAcrossPages()
+    public async Task AC2_Pagination_NoOverlapAcrossPages()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
 
-        var p1Resp = client.GetAsync("/api/food/restaurants?limit=3&page=1").GetAwaiter().GetResult();
-        var p1Json = GetJson(p1Resp).GetAwaiter().GetResult();
+        var p1Resp = await client.GetAsync("/api/food/restaurants?limit=3&page=1");
+        var p1Json = await GetJson(p1Resp);
         var p1Ids = p1Json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("id").GetGuid()).ToList();
 
-        var p2Resp = client.GetAsync("/api/food/restaurants?limit=3&page=2").GetAwaiter().GetResult();
-        var p2Json = GetJson(p2Resp).GetAwaiter().GetResult();
+        var p2Resp = await client.GetAsync("/api/food/restaurants?limit=3&page=2");
+        var p2Json = await GetJson(p2Resp);
         var p2Ids = p2Json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("id").GetGuid()).ToList();
 
@@ -131,12 +131,12 @@ public class RestaurantEndpointTests
     }
 
     [SkippableFact]
-    public void AC2_Pagination_TotalPages_Correct()
+    public async Task AC2_Pagination_TotalPages_Correct()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants?limit=4").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?limit=4");
+        var json = await GetJson(response);
         var p = json.GetProperty("pagination");
         p.GetProperty("totalItems").GetInt32().Should().Be(10);
         p.GetProperty("totalPages").GetInt32().Should().Be(3); // ceil(10/4)
@@ -147,20 +147,20 @@ public class RestaurantEndpointTests
     // ====================================================================
 
     [SkippableFact]
-    public void AC3_InvalidPage_Returns422()
+    public async Task AC3_InvalidPage_Returns422()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants?page=0").GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?page=0");
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     [SkippableFact]
-    public void AC3_InvalidLimit_Returns422()
+    public async Task AC3_InvalidLimit_Returns422()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync("/api/food/restaurants?limit=51").GetAwaiter().GetResult();
+        var response = await client.GetAsync("/api/food/restaurants?limit=51");
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
@@ -169,18 +169,18 @@ public class RestaurantEndpointTests
     // ====================================================================
 
     [SkippableFact]
-    public void AC4_ValidMenu_NestedStructure()
+    public async Task AC4_ValidMenu_NestedStructure()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
         // Get first restaurant
-        var list = client.GetAsync("/api/food/restaurants?limit=1").GetAwaiter().GetResult();
-        var listJson = GetJson(list).GetAwaiter().GetResult();
+        var list = await client.GetAsync("/api/food/restaurants?limit=1");
+        var listJson = await GetJson(list);
         var id = listJson.GetProperty("data").EnumerateArray().First().GetProperty("id").GetGuid();
 
-        var response = client.GetAsync($"/api/food/restaurants/{id}/menu").GetAwaiter().GetResult();
+        var response = await client.GetAsync($"/api/food/restaurants/{id}/menu");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var json = await GetJson(response);
 
         json.GetProperty("restaurantId").GetGuid().Should().Be(id);
         var categories = json.GetProperty("categories").EnumerateArray().ToList();
@@ -206,27 +206,27 @@ public class RestaurantEndpointTests
     }
 
     [SkippableFact]
-    public void AC4_Menu_404_UnknownRestaurant()
+    public async Task AC4_Menu_404_UnknownRestaurant()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var response = client.GetAsync($"/api/food/restaurants/{Guid.NewGuid()}/menu").GetAwaiter().GetResult();
+        var response = await client.GetAsync($"/api/food/restaurants/{Guid.NewGuid()}/menu");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var json = await GetJson(response);
         json.GetProperty("error").GetString().Should().Be("not_found");
     }
 
     [SkippableFact]
-    public void AC4_Menu_isAvailable_NonNull()
+    public async Task AC4_Menu_isAvailable_NonNull()
     {
         Skip.If(ShouldSkip());
         var client = CreateClient();
-        var list = client.GetAsync("/api/food/restaurants?limit=1").GetAwaiter().GetResult();
-        var listJson = GetJson(list).GetAwaiter().GetResult();
+        var list = await client.GetAsync("/api/food/restaurants?limit=1");
+        var listJson = await GetJson(list);
         var id = listJson.GetProperty("data").EnumerateArray().First().GetProperty("id").GetGuid();
 
-        var response = client.GetAsync($"/api/food/restaurants/{id}/menu").GetAwaiter().GetResult();
-        var json = GetJson(response).GetAwaiter().GetResult();
+        var response = await client.GetAsync($"/api/food/restaurants/{id}/menu");
+        var json = await GetJson(response);
         var items = json.GetProperty("categories").EnumerateArray()
             .SelectMany(c => c.GetProperty("items").EnumerateArray());
 
