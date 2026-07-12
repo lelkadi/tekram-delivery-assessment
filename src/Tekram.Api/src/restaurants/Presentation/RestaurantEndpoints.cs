@@ -2,6 +2,7 @@ namespace Tekram.Api.src.restaurants.Presentation;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Tekram.Api.src.restaurants.Application.DTOs;
 using Tekram.Api.src.restaurants.Application.Handlers;
 
@@ -16,9 +17,11 @@ public static class RestaurantEndpoints
         // GET /api/food/restaurants
         group.MapGet("/", async (
             [AsParameters] SearchRestaurantsRequest request,
+            [FromQuery(Name = "price_tier")] int? priceTier,
             SearchRestaurantsHandler handler,
             CancellationToken ct) =>
         {
+            request = request with { PriceTier = priceTier };
             var response = await handler.HandleAsync(request, ct);
             return Results.Ok(response);
         })
