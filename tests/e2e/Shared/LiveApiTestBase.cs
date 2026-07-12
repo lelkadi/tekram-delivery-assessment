@@ -29,9 +29,10 @@ public abstract class LiveApiTestBase : IDisposable
     public static string? BaseUrl { get; } =
         Environment.GetEnvironmentVariable("E2E_BASE_URL")?.TrimEnd('/');
 
-    protected HttpClient Client { get; }
+    private HttpClient? _client;
+    protected HttpClient Client => _client ??= NewClient();
 
-    protected LiveApiTestBase() => Client = NewClient();
+    protected LiveApiTestBase() { }
 
     protected static HttpClient NewClient() =>
         new()
@@ -42,7 +43,7 @@ public abstract class LiveApiTestBase : IDisposable
 
     public void Dispose()
     {
-        Client.Dispose();
+        _client?.Dispose();
         GC.SuppressFinalize(this);
     }
 }
