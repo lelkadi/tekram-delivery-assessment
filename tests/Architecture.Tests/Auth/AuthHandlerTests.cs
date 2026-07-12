@@ -1,5 +1,4 @@
 using System.Net;
-using System.Xml.Linq;
 using FluentAssertions;
 
 namespace Tekram.Architecture.Tests.Auth;
@@ -212,16 +211,8 @@ public class AuthHandlerTests
             "ITokenProvider.TokenExpiration must NOT return TimeSpan (was a scaffold error in #9)");
     }
 
-    // ── AC6: net8.0 compliance (TD-004) ──
-
-    [Fact]
-    public void AC6_Net80Compliance()
-    {
-        var apiProj = Path.Combine(RepoRoot, "src", "Tekram.Api", "Tekram.Api.csproj");
-        var apiXml = XDocument.Load(apiProj);
-        apiXml.Descendants("TargetFramework").FirstOrDefault()?.Value
-            .Should().Be("net8.0", "API project must target net8.0 LTS (TD-004)");
-    }
+    // AC6 (net8.0 compliance) was a strict subset of AuthDomainTests.AC5 —
+    // consolidated there per issue #64.
 
     // ── AC7: API boots (smoke test) ──
 

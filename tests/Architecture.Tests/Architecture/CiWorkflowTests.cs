@@ -171,21 +171,8 @@ public class CiWorkflowTests
             "should cancel in-progress runs on new pushes");
     }
 
-    // ========================================================================
-    // AC8: CI pipeline stages are logically ordered (no contradictions)
-    // ========================================================================
-
-    [Fact]
-    public void AC8_E2eJobFollowsBuildTest()
-    {
-        var content = File.ReadAllText(CiPath);
-
-        // The e2e job must appear after build-test in the file (logical ordering)
-        var buildTestIdx = content.IndexOf("build-test:", StringComparison.Ordinal);
-        var e2eIdx = content.IndexOf("  e2e:", StringComparison.Ordinal);
-        e2eIdx.Should().BeGreaterThan(buildTestIdx,
-            "e2e job definition must appear after build-test in the workflow file");
-    }
+    // AC8 (string-index ordering of job definitions) was removed per issue #64: YAML job
+    // order is semantically irrelevant — `needs: build-test` (AC5) is the real dependency.
 
     // ========================================================================
     // AC9: Migration + seed happen at API boot (not as separate CI steps)
