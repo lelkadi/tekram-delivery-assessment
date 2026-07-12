@@ -18,6 +18,7 @@ public static class ErrorCodes
     // Orders
     public const string ItemUnavailable = "item_unavailable";
     public const string InvalidCoupon = "invalid_coupon";
+    public const string InvalidCustomization = "invalid_customization";
     public const string InsufficientBalance = "insufficient_balance";
 
     // Rate limiting
