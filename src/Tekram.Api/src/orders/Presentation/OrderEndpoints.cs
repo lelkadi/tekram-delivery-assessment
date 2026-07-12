@@ -18,14 +18,14 @@ public static class OrderEndpoints
             HttpContext httpContext,
             CancellationToken ct) =>
         {
-            // In a real app this would come from the JWT claims
-            var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userIdClaim = httpContext.User.FindFirst("sub")?.Value;
             if (string.IsNullOrWhiteSpace(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
                 return Results.Unauthorized();
 
             var response = await handler.HandleAsync(userId, request, ct);
             return Results.Created($"/api/food/orders/{response.BookingId}", response);
         })
+        .RequireAuthorization()
         .WithName("PlaceOrder")
         .WithOpenApi();
 
