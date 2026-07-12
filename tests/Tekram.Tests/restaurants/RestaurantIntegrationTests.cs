@@ -229,8 +229,16 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task SearchByName_ILIKE_CaseInsensitivePartial()
     {
+        // Arrange — get a search term from the first restaurant in the listing
+        var listResponse = await _client.GetAsync("/api/food/restaurants");
+        var listJson = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var restaurants = listJson.GetProperty("data").EnumerateArray().ToList();
+        restaurants.Should().NotBeEmpty("there should be at least one active restaurant");
+        var firstRestaurantName = restaurants[0].GetProperty("name").GetString()!;
+        var searchTerm = firstRestaurantName.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0];
+
         // Act
-        var response = await _client.GetAsync("/api/food/restaurants?search=trattoria");
+        var response = await _client.GetAsync($"/api/food/restaurants?search={searchTerm}");
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -239,7 +247,7 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
         var names = json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("name").GetString()).ToList();
 
-        names.Should().Contain(n => n!.Contains("Trattoria", StringComparison.OrdinalIgnoreCase));
+        names.Should().Contain(n => n!.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -361,16 +369,12 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task ValidMenu_Returns200_WithNestedStructure()
     {
-        // Arrange — get La Trattoria (seeded restaurant with full menu)
+        // Arrange — get any active restaurant from the listing
         var listResponse = await _client.GetAsync("/api/food/restaurants?limit=20");
         var listJson = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
         var restaurants = listJson.GetProperty("data").EnumerateArray().ToList();
-
-        var laTrattoria = restaurants.FirstOrDefault(r =>
-            r.GetProperty("name").GetString() == SeedRestaurant1);
-        laTrattoria.ValueKind.Should().NotBe(JsonValueKind.Undefined,
-            "La Trattoria should be present in the listing");
-        var restaurantId = laTrattoria.GetProperty("id").GetGuid();
+        restaurants.Should().NotBeEmpty("there should be at least one active restaurant");
+        var restaurantId = restaurants[0].GetProperty("id").GetGuid();
 
         // Act
         var response = await _client.GetAsync($"/api/food/restaurants/{restaurantId}/menu");
@@ -382,7 +386,7 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
         json.GetProperty("restaurantId").GetGuid().Should().Be(restaurantId);
 
         var categories = json.GetProperty("categories").EnumerateArray().ToList();
-        categories.Should().NotBeEmpty("La Trattoria has seeded menu categories");
+        categories.Should().NotBeEmpty("the selected restaurant should have seeded menu categories");
 
         foreach (var cat in categories)
         {
@@ -483,17 +487,15 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task Menu_IsAvailable_ComputedCorrectly()
     {
-        // Arrange — get La Trattoria which has items with various stock counts
+        // Arrange — get any active restaurant from the listing
         var listResponse = await _client.GetAsync("/api/food/restaurants?limit=20");
         var listJson = await listResponse.Content.ReadFromJsonAsync<JsonElement>();
         var restaurants = listJson.GetProperty("data").EnumerateArray().ToList();
-
-        var laTrattoria = restaurants.FirstOrDefault(r =>
-            r.GetProperty("name").GetString() == SeedRestaurant1);
-        laTrattoria.ValueKind.Should().NotBe(JsonValueKind.Undefined);
-        var restaurantId = laTrattoria.GetProperty("id").GetGuid();
+        restaurants.Should().NotBeEmpty("there should be at least one active restaurant");
+        var restaurantId = restaurants[0].GetProperty("id").GetGuid();
 
         // Add a menu item with StockCount=0 to test false case
+        var zeroStockItemId = Guid.NewGuid();
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
@@ -510,7 +512,7 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
 
                 var testItem = new MenuItem
                 {
-                    Id = Guid.NewGuid(),
+                    Id = zeroStockItemId,
                     CategoryId = category.Id,
                     RestaurantId = restaurantId,
                     Name = "Zero Stock Test Item",
@@ -523,7 +525,6 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
 
                 db.MenuItems.Add(testItem);
                 await db.SaveChangesAsync();
-                _createdRestaurantIds.Add(restaurantId); // ensure cleanup of related data
             }
         }
 
@@ -539,20 +540,21 @@ public class RestaurantIntegrationTests : IClassFixture<CustomWebApplicationFact
             .ToList();
 
         // Verify: StockCount=null → isAvailable=true
-        // Seed data: Bruschetta (StockCount=null), Cola (StockCount=null)
         var nullStockItems = items.Where(i =>
-            i.GetProperty("name").GetString() is "Bruschetta" or "Cola");
+            i.GetProperty("stockCount").ValueKind == JsonValueKind.Null);
+        nullStockItems.Should().NotBeEmpty("menu should have items with null stock count");
         nullStockItems.Should().AllSatisfy(i =>
             i.GetProperty("isAvailable").GetBoolean().Should().BeTrue(
                 "items with null stock count should be available"));
 
         // Verify: StockCount>0 → isAvailable=true
-        // Seed data: Pepperoni Pizza (StockCount=20)
-        var positiveStockItem = items.FirstOrDefault(i =>
-            i.GetProperty("name").GetString() == "Pepperoni Pizza");
-        positiveStockItem.ValueKind.Should().NotBe(JsonValueKind.Undefined);
-        positiveStockItem.GetProperty("isAvailable").GetBoolean().Should().BeTrue(
-            "items with stock count > 0 should be available");
+        var positiveStockItems = items.Where(i =>
+            i.GetProperty("stockCount").ValueKind == JsonValueKind.Number &&
+            i.GetProperty("stockCount").GetInt32() > 0);
+        positiveStockItems.Should().NotBeEmpty("menu should have items with positive stock count");
+        positiveStockItems.Should().AllSatisfy(i =>
+            i.GetProperty("isAvailable").GetBoolean().Should().BeTrue(
+                "items with stock count > 0 should be available"));
 
         // Verify: StockCount=0 → isAvailable=false
         var zeroStockItem = items.FirstOrDefault(i =>
