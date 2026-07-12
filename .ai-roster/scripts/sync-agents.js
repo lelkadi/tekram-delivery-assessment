@@ -237,23 +237,13 @@ function emitAntigravityAgent(id, cfg, body) {
   if (fs.existsSync(oldJson)) {
     fs.rmSync(oldJson, { force: true });
   }
+  const oldConfig = path.join(dir, 'config.json');
+  if (fs.existsSync(oldConfig)) {
+    fs.rmSync(oldConfig, { force: true });
+  }
 
   ensureDirSync(dir);
   fs.writeFileSync(path.join(dir, 'agent.md'), frontmatter + body);
-
-  // config.json — Antigravity IDE reads this alongside agent.md to determine available tools.
-  // Without this file (or with wrong tool names), the agent runs in read-only mode.
-  // Tool names MUST match the SDK BuiltinTools enum: view_file, list_directory, search_directory,
-  // find_file, create_file, edit_file, run_command, generate_image, ask_question, start_subagent.
-  // We map the CLI tool names to their IDE-equivalent enums.
-  const cliToIdeMap = {
-    'list_dir': 'list_directory',
-    'grep_search': 'search_directory',
-    'write_to_file': 'create_file',
-    'replace_file_content': 'edit_file',
-  };
-  const ideTools = cliTools.map(t => cliToIdeMap[t] || t);
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ tools: ideTools }, null, 4) + '\n');
 
   console.log(`[Antigravity] ${cfg.display_name} -> .agents/agents/${id}/agent.md (model: ${model})`);
 }
