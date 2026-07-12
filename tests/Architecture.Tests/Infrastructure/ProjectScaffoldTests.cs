@@ -1,7 +1,7 @@
 using System.Xml.Linq;
 using FluentAssertions;
 
-namespace Tekram.E2E.Infrastructure;
+namespace Tekram.Architecture.Tests.Infrastructure;
 
 [Trait("issue", "7")]
 public class ProjectScaffoldTests

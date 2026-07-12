@@ -74,6 +74,15 @@ jobs:
       - name: Integration tests
         run: dotnet test Tekram.sln --no-build
 
+      # Scaffold/blueprint-compliance suite (issue #58) — outside Tekram.sln like the e2e
+      # project, but it needs no live API: it inspects the repo tree, plus this job's
+      # postgres/redis service containers for the compose-stack reachability check.
+      - name: Architecture tests
+        run: |
+          dotnet restore tests/Architecture.Tests/Tekram.Architecture.Tests.csproj
+          dotnet build tests/Architecture.Tests/Tekram.Architecture.Tests.csproj --no-restore
+          dotnet test tests/Architecture.Tests --no-build
+
   e2e:
     name: Black-box e2e (TD-008)
     runs-on: ubuntu-latest

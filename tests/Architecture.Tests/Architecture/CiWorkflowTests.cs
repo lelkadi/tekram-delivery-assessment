@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
 
-namespace Tekram.E2E.Architecture;
+namespace Tekram.Architecture.Tests.Architecture;
 
 /// <summary>
 /// Black-box e2e verification for issue #45 (Part 5 · CI workflow).

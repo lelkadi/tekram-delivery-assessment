@@ -2,7 +2,7 @@ using System.Net;
 using System.Xml.Linq;
 using FluentAssertions;
 
-namespace Tekram.E2E.Auth;
+namespace Tekram.Architecture.Tests.Auth;
 
 /// <summary>
 /// Black-box coverage for issue #9 (Part 2 Slice 1.3 — Auth domain: entities, DTOs,
