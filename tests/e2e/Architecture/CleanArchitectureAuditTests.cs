@@ -22,10 +22,9 @@ namespace Tekram.E2E.Architecture;
 /// Plus regression: existing API endpoints still work after the cleanup.
 /// </summary>
 [Trait("issue", "21")]
-public class CleanArchitectureAuditTests
+public class CleanArchitectureAuditTests : LiveApiTestBase
 {
     private static readonly string RepoRoot = FindRepoRoot();
-    private static readonly string? BaseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
     private static readonly string SrcRoot = Path.Combine(RepoRoot, "src", "Tekram.Api", "src");
 
     private static string FindRepoRoot()
@@ -452,44 +451,44 @@ public class CleanArchitectureAuditTests
     // REGRESSION: API endpoints still work after cleanup
     // ========================================================================
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC_Regression_AuthRegister_ValidationWorks()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-        using var client = new HttpClient { BaseAddress = new Uri(BaseUrl!) };
-        client.Timeout = TimeSpan.FromSeconds(10);
+        
+        
+        
 
         // Register with invalid phone — should get 422 validation error (API boots + auth routes work)
         var payload = new { name = "CATest", email = "ca.test@tekram.dev", phone = "invalid", password = "Test123!", role = "customer" };
-        var response = await client.PostAsJsonAsync("/api/auth/register", payload);
+        var response = await Client.PostAsJsonAsync("/api/auth/register", payload);
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity,
             "Auth endpoints must return validation errors after architecture cleanup");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC_Regression_RestaurantBrowse_ReturnsData()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-        using var client = new HttpClient { BaseAddress = new Uri(BaseUrl!) };
-        client.Timeout = TimeSpan.FromSeconds(10);
+        
+        
+        
 
-        var response = await client.GetAsync("/api/food/restaurants");
+        var response = await Client.GetAsync("/api/food/restaurants");
         response.StatusCode.Should().Be(HttpStatusCode.OK,
             "Restaurant browse must work after architecture cleanup");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC_Regression_MenuEndpoint_ReturnsNestedStructure()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-        using var client = new HttpClient { BaseAddress = new Uri(BaseUrl!) };
-        client.Timeout = TimeSpan.FromSeconds(10);
+        
+        
+        
 
         // Get first restaurant ID
-        var list = await client.GetFromJsonAsync<JsonElement>("/api/food/restaurants?limit=1");
+        var list = await Client.GetFromJsonAsync<JsonElement>("/api/food/restaurants?limit=1");
         var id = list.GetProperty("data")[0].GetProperty("id").GetGuid();
 
-        var response = await client.GetAsync($"/api/food/restaurants/{id}/menu");
+        var response = await Client.GetAsync($"/api/food/restaurants/{id}/menu");
         response.StatusCode.Should().Be(HttpStatusCode.OK,
             "Menu endpoint must work after architecture cleanup");
 
@@ -498,15 +497,15 @@ public class CleanArchitectureAuditTests
             "Menu must contain categories after cleanup");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC_Regression_PriceTier_CamelCaseWorks()
     {
         // priceTier (camelCase) MUST work — the backend field name
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-        using var client = new HttpClient { BaseAddress = new Uri(BaseUrl!) };
-        client.Timeout = TimeSpan.FromSeconds(10);
+        
+        
+        
 
-        var response = await client.GetAsync("/api/food/restaurants?priceTier=2");
+        var response = await Client.GetAsync("/api/food/restaurants?priceTier=2");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         var data = json.GetProperty("data").EnumerateArray().ToList();
@@ -515,19 +514,19 @@ public class CleanArchitectureAuditTests
             "CamelCase priceTier filter must work after [FromQuery] removal");
     }
 
-    [SkippableFact]
-    public void AC_Regression_PriceTier_SnakeCaseContract()
+    [LiveFact]
+    public async Task AC_Regression_PriceTier_SnakeCaseContract()
     {
         // price_tier (snake_case) is the DOCUMENTED API contract.
         // This test documents the regression: removing [FromQuery(Name = "price_tier")]
         // broke snake_case binding. CamelCase priceTier works, but the contract says snake_case.
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-        using var client = new HttpClient { BaseAddress = new Uri(BaseUrl!) };
-        client.Timeout = TimeSpan.FromSeconds(10);
+        
+        
+        
 
-        var response = client.GetAsync("/api/food/restaurants?price_tier=2").GetAwaiter().GetResult();
+        var response = await Client.GetAsync("/api/food/restaurants?price_tier=2");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var json = response.Content.ReadFromJsonAsync<JsonElement>().GetAwaiter().GetResult();
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
         var data = json.GetProperty("data").EnumerateArray().ToList();
         data.Should().NotBeEmpty();
 
