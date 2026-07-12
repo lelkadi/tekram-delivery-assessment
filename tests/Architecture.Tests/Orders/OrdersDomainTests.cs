@@ -1,4 +1,4 @@
-namespace Tekram.E2E.Orders;
+namespace Tekram.Architecture.Tests.Orders;
 
 using FluentAssertions;
 
