@@ -27,24 +27,19 @@ using Xunit;
 ///    equivalent available to curling an endpoint that doesn't exist yet).
 /// </summary>
 [Trait("issue", "8")]
-public class SharedKernelTests
+public class SharedKernelTests : LiveApiTestBase
 {
-    private static readonly string? BaseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
-
     private static readonly string DatabaseUrl =
         Environment.GetEnvironmentVariable("DATABASE_URL")
         ?? "postgres://postgres:postgres@localhost:5432/tekram_lane2";
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC1_ApiBootsAndServesRequests()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set — no live lane API to test against.");
-
-        using var client = new HttpClient { BaseAddress = new Uri(BaseUrl!) };
         HttpResponseMessage response;
         try
         {
-            response = await client.GetAsync("/");
+            response = await Client.GetAsync("/");
         }
         catch (HttpRequestException ex)
         {
@@ -59,13 +54,12 @@ public class SharedKernelTests
             "mode (an invalid EF Core model) PM's rejection of #8 was about.");
     }
 
-    [SkippableFact]
+    [LiveFact]
     public void AC2_PartialIndexFiltersReferenceRealColumns()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set — no live lane stack to test against.");
-
-        using var conn = OpenConnection(DatabaseUrl, out var skip);
-        Skip.If(conn is null, skip);
+        using var conn = OpenConnection(DatabaseUrl, out var reason);
+        Assert.True(conn is not null,
+            $"Lane Postgres must be reachable when E2E_BASE_URL is set (the API depends on it): {reason}");
 
         // The regression: TekramDbContext.OnModelCreating's HasFilter(...) clauses referencing a
         // column name the model doesn't actually produce — Postgres 42703 at CREATE INDEX time.

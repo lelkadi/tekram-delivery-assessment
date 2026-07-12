@@ -16,13 +16,8 @@ using FluentAssertions;
 /// of the #16 handler bug.
 /// </summary>
 [Trait("issue", "17")]
-public class OrdersCouponSeedTests
+public class OrdersCouponSeedTests : LiveApiTestBase
 {
-    private static readonly string? BaseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
-
-    private static HttpClient NewClient() =>
-        new() { BaseAddress = new Uri((BaseUrl ?? "http://localhost:3021").TrimEnd('/')) };
-
     // ── helpers ──────────────────────────────────────────────────────────
 
     private static async Task<JsonElement> GetJson(HttpResponseMessage r) =>
@@ -32,21 +27,16 @@ public class OrdersCouponSeedTests
     // AC1: DI registration — app boots and resolves all services
     // ══════════════════════════════════════════════════════════════════════
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC1_DI_AppBootsSuccessfully()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl),
-            "E2E_BASE_URL not set — no live lane API to test against");
-
-        using var client = NewClient();
-
         // Health endpoint — proves all DI registrations resolved at startup
-        var healthResp = await client.GetAsync("/healthz");
+        var healthResp = await Client.GetAsync("/healthz");
         healthResp.StatusCode.Should().Be(HttpStatusCode.OK,
             "/healthz must return 200 — confirms app started with all DI registrations intact");
 
         // Restaurant browse — proves the DI container resolved restaurant services
-        var listResp = await client.GetAsync("/api/food/restaurants?limit=1");
+        var listResp = await Client.GetAsync("/api/food/restaurants?limit=1");
         listResp.StatusCode.Should().Be(HttpStatusCode.OK,
             "restaurant browse must return 200 — confirms DI container is functional");
     }
@@ -55,17 +45,12 @@ public class OrdersCouponSeedTests
     // AC2: Orders endpoint is mapped via MapOrderEndpoints() + DI wired
     // ══════════════════════════════════════════════════════════════════════
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC2_OrdersEndpoint_Returns401_Not404()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl),
-            "E2E_BASE_URL not set — no live lane API to test against");
-
-        using var client = NewClient();
-
         // Unauthenticated POST — payload must match PlaceOrderRequest DTO exactly
         // (deliveryAddress is a string, not an object; paymentMethod required)
-        var resp = await client.PostAsJsonAsync("/api/food/orders", new
+        var resp = await Client.PostAsJsonAsync("/api/food/orders", new
         {
             restaurantId = Guid.NewGuid().ToString(),
             items = new[]
@@ -109,18 +94,13 @@ public class OrdersCouponSeedTests
     //   - EXPIRED50 (Active=false)   → 422 "invalid_coupon"
     //   - BIGSPENDER (min $100)      → 422 "invalid_coupon"
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC3_AuthenticatedOrder_BlockedByClaimTypeMismatch()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl),
-            "E2E_BASE_URL not set — no live lane API to test against");
-
-        using var client = NewClient();
-
         // Register a test user (with role field required by auth validator)
         var email = $"e2e-{Guid.NewGuid():N}@test.com";
         var phone = $"+961{70_000_000 + Random.Shared.Next(0, 9_999_999)}";
-        var regResp = await client.PostAsJsonAsync("/api/auth/register", new
+        var regResp = await Client.PostAsJsonAsync("/api/auth/register", new
         {
             email, phone,
             password = "Test123!",
@@ -136,11 +116,11 @@ public class OrdersCouponSeedTests
         var token = regBody.GetProperty("token").GetString()!;
 
         // Discover a real restaurant and menu item
-        var listResp = await client.GetAsync("/api/food/restaurants?limit=1");
+        var listResp = await Client.GetAsync("/api/food/restaurants?limit=1");
         var listJson = await GetJson(listResp);
         var restaurantId = listJson.GetProperty("data")[0].GetProperty("id").GetString()!;
 
-        var menuResp = await client.GetAsync(
+        var menuResp = await Client.GetAsync(
             $"/api/food/restaurants/{restaurantId}/menu");
         var menuJson = await GetJson(menuResp);
         var menuItemId = menuJson.GetProperty("categories")[0]
