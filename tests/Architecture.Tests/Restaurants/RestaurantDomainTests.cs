@@ -1,4 +1,4 @@
-namespace Tekram.E2E.Restaurants;
+namespace Tekram.Architecture.Tests.Restaurants;
 
 using FluentAssertions;
 

@@ -15,13 +15,8 @@ namespace Tekram.E2E.Restaurants;
 /// stock counts and customization groups, correct pagination, and working filters.
 /// </summary>
 [Trait("issue", "14")]
-public class RestaurantSeedTests
+public class RestaurantSeedTests : LiveApiTestBase
 {
-    private static readonly string? BaseUrl = Environment.GetEnvironmentVariable("E2E_BASE_URL");
-
-    private static HttpClient NewClient() =>
-        new() { BaseAddress = new Uri((BaseUrl ?? "http://localhost:3021").TrimEnd('/')) };
-
     // ── helpers ──────────────────────────────────────────────────────────
 
     private static async Task<JsonElement> GetJsonAsync(HttpClient client, string path)
@@ -34,13 +29,10 @@ public class RestaurantSeedTests
 
     // ── AC1: At least 8–10 restaurants seeded ────────────────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC1_AtLeastTenRestaurantsSeeded()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var json = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var json = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         var total = json.GetProperty("pagination").GetProperty("totalItems").GetInt32();
         total.Should().BeGreaterThanOrEqualTo(8,
@@ -49,13 +41,10 @@ public class RestaurantSeedTests
 
     // ── AC2: Varied cuisines ─────────────────────────────────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC2_VariedCuisinesCoverage()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var json = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var json = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         var cuisines = json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("cuisine").GetString()!)
@@ -73,13 +62,10 @@ public class RestaurantSeedTests
 
     // ── AC3: Price tiers 1–4 present, ratings 3.5–5.0 ────────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC3_PriceTiersOneThroughFourPresent()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var json = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var json = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         var tiers = json.GetProperty("data").EnumerateArray()
             .Select(r => r.GetProperty("priceTier").GetInt32())
@@ -101,13 +87,10 @@ public class RestaurantSeedTests
     // ── AC4: Each restaurant has a full nested menu (2-4 categories,
     //        3-6 items per category) ───────────────────────────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC4_EachRestaurantHasFullMenu()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var list = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var list = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         var failures = new List<string>();
 
@@ -116,7 +99,7 @@ public class RestaurantSeedTests
             var id = r.GetProperty("id").GetString()!;
             var name = r.GetProperty("name").GetString()!;
 
-            var menu = await GetJsonAsync(client, $"/api/food/restaurants/{id}/menu");
+            var menu = await GetJsonAsync(Client, $"/api/food/restaurants/{id}/menu");
             var cats = menu.GetProperty("categories").EnumerateArray().ToList();
 
             if (cats.Count < 2 || cats.Count > 4)
@@ -136,13 +119,10 @@ public class RestaurantSeedTests
 
     // ── AC5: Some items have limited stock_count; most are null ───────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC5_SomeItemsHaveLimitedStock()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var list = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var list = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         int totalItems = 0;
         int limitedStock = 0;
@@ -150,7 +130,7 @@ public class RestaurantSeedTests
         foreach (var r in list.GetProperty("data").EnumerateArray())
         {
             var id = r.GetProperty("id").GetString()!;
-            var menu = await GetJsonAsync(client, $"/api/food/restaurants/{id}/menu");
+            var menu = await GetJsonAsync(Client, $"/api/food/restaurants/{id}/menu");
 
             foreach (var cat in menu.GetProperty("categories").EnumerateArray())
             foreach (var item in cat.GetProperty("items").EnumerateArray())
@@ -170,13 +150,10 @@ public class RestaurantSeedTests
 
     // ── AC6: Customization groups exist on select items ──────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC6_CustomizationGroupsExist()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var list = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var list = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         int groups = 0;
         int options = 0;
@@ -184,7 +161,7 @@ public class RestaurantSeedTests
         foreach (var r in list.GetProperty("data").EnumerateArray())
         {
             var id = r.GetProperty("id").GetString()!;
-            var menu = await GetJsonAsync(client, $"/api/food/restaurants/{id}/menu");
+            var menu = await GetJsonAsync(Client, $"/api/food/restaurants/{id}/menu");
 
             foreach (var cat in menu.GetProperty("categories").EnumerateArray())
             foreach (var item in cat.GetProperty("items").EnumerateArray())
@@ -203,13 +180,10 @@ public class RestaurantSeedTests
 
     // ── AC7: Sushi Zen has a non-empty menu (PM rejection regression) ────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC7_SushiZenHasNonEmptyMenu()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-        var list = await GetJsonAsync(client, "/api/food/restaurants?limit=50");
+        var list = await GetJsonAsync(Client, "/api/food/restaurants?limit=50");
 
         // Find Sushi Zen
         JsonElement? sushiZen = null;
@@ -225,7 +199,7 @@ public class RestaurantSeedTests
         sushiZen.Should().NotBeNull("Sushi Zen must be seeded");
         var szId = sushiZen!.Value.GetProperty("id").GetString()!;
 
-        var menu = await GetJsonAsync(client, $"/api/food/restaurants/{szId}/menu");
+        var menu = await GetJsonAsync(Client, $"/api/food/restaurants/{szId}/menu");
 
         var cats = menu.GetProperty("categories").EnumerateArray().ToList();
         cats.Count.Should().BeGreaterThan(0,
@@ -238,15 +212,11 @@ public class RestaurantSeedTests
 
     // ── AC8: Pagination works — page 1 and page 2 have no overlap ────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC8_PaginationWithTenRestaurants()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-
-        var page1 = await GetJsonAsync(client, "/api/food/restaurants?limit=5&page=1");
-        var page2 = await GetJsonAsync(client, "/api/food/restaurants?limit=5&page=2");
+        var page1 = await GetJsonAsync(Client, "/api/food/restaurants?limit=5&page=1");
+        var page2 = await GetJsonAsync(Client, "/api/food/restaurants?limit=5&page=2");
 
         var p1 = page1.GetProperty("pagination");
         p1.GetProperty("totalItems").GetInt32().Should().Be(10);
@@ -264,14 +234,10 @@ public class RestaurantSeedTests
 
     // ── AC9: Search by cuisine filters correctly ─────────────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC9_CuisineFilterReturnsCorrectResults()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-
-        var json = await GetJsonAsync(client, "/api/food/restaurants?cuisine=Italian");
+        var json = await GetJsonAsync(Client, "/api/food/restaurants?cuisine=Italian");
 
         var data = json.GetProperty("data").EnumerateArray().ToList();
         data.Should().NotBeEmpty("Italian cuisine filter must return results");
@@ -281,14 +247,10 @@ public class RestaurantSeedTests
 
     // ── AC10: Price-tier filter returns correct results ──────────────────
 
-    [SkippableFact]
+    [LiveFact]
     public async Task AC10_PriceTierFilterReturnsCorrectResults()
     {
-        Skip.If(string.IsNullOrWhiteSpace(BaseUrl), "E2E_BASE_URL not set");
-
-        using var client = NewClient();
-
-        var json = await GetJsonAsync(client, "/api/food/restaurants?price_tier=4");
+        var json = await GetJsonAsync(Client, "/api/food/restaurants?price_tier=4");
 
         var data = json.GetProperty("data").EnumerateArray().ToList();
         data.Should().NotBeEmpty("price_tier=4 filter must return results");

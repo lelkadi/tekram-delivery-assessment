@@ -2,7 +2,7 @@ using System.Net;
 using System.Xml.Linq;
 using FluentAssertions;
 
-namespace Tekram.E2E.Auth;
+namespace Tekram.Architecture.Tests.Auth;
 
 /// <summary>
 /// Black-box coverage for issue #10 (Part 2 Slice 1.4 — Auth handlers, infrastructure,
