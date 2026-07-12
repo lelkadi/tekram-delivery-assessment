@@ -279,7 +279,7 @@ public class AuthDomainTests
         // The architect found commit b1176ca bundled 13 .ai-roster files.
         // Verify the eng-lead instructions file doesn't contain any auth-domain references
         // (it was one of the files in the out-of-scope commit).
-        var engLeadFile = Path.Combine(aiRosterDir, "eng_lead_instructions.md");
+        var engLeadFile = Path.Combine(aiRosterDir, "agents", "eng_lead_instructions.md");
         if (File.Exists(engLeadFile))
         {
             // Just verify the file exists — the content audit is

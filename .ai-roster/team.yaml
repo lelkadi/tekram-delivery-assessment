@@ -57,6 +57,23 @@ agents:
     instructions_file: "eng_lead_instructions.md"
     skills: ["github_flow"]
 
+  # ── Stage 3-4: Engineering Lead — antigravity/Gemini gate (TD-012) ────────
+  # DECISION (founder, 2026-07-12, TD-012): eng-lead gets a second gate/runtime
+  # option on antigravity/Gemini 3.5 Flash for runtime diversity.
+  # Same instructions file, same protocol — only the runtime/model differs.
+  eng-lead-antigravity:
+    display_name: "Engineering Lead — Antigravity (Gemini 3.5 Flash)"
+    stage: "3-ready-for-dev -> 5-in-review (drives engineers; does not implement)"
+    environment: "antigravity"
+    model: "Gemini 3.5 Flash"
+    thinking: "high"
+    mode: "accept-edits"
+    dangerously_skip_permissions: true
+    write_scope: []
+    instructions_file: "eng_lead_instructions.md"
+    skills: ["github_flow"]
+
+
   # ── Stage 0: intake ────────────────────────────────────────────────────────
   # Two intake PMs with distinct sources:
   #   pm-doc-intake — seeds epics + work issues from docs/ (plan + design docs); used to
@@ -227,6 +244,8 @@ agents:
     environment: "antigravity"
     model: "Gemini 3.5 Flash"
     thinking: "high"
+    mode: "accept-edits"
+    dangerously_skip_permissions: true
     instructions_file: "architect_review_instructions.md"
     skills: ["github_flow"]
 

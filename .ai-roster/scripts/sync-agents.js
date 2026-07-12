@@ -2,7 +2,7 @@
 // .ai-roster/scripts/sync-agents.js
 //
 // Single source of truth -> three runtimes.
-//   SOURCE:  .ai-roster/team.yaml  +  .ai-roster/<role>_instructions.md
+//   SOURCE:  .ai-roster/team.yaml  +  .ai-roster/agents/<role>_instructions.md
 //   EMIT (environment: claude-code):  .claude/agents/<id>.md    (true subagents, fresh context)
 //   EMIT (environment: opencode):     .opencode/agents/<id>.md  (markdown + YAML frontmatter)
 //   EMIT (environment: antigravity):  .agents/agents/<id>/agent.md
@@ -34,7 +34,7 @@ function ensureDirSync(dirPath) {
 }
 
 function readInstructions(file) {
-  const p = path.join(ROSTER_DIR, file);
+  const p = path.join(ROSTER_DIR, 'agents', file);
   if (!fs.existsSync(p)) {
     // Fail loudly — the old script silently threw on a missing frontend_instructions.md.
     throw new Error(`Missing instructions_file: ${file} (expected at ${p})`);
@@ -219,6 +219,9 @@ function emitAntigravityAgent(id, cfg, body) {
     name: id,
     description: cfg.display_name,
     model,
+    ...(cfg.mode ? { mode: cfg.mode } : {}),
+    ...(cfg.dangerously_skip_permissions ? { dangerously_skip_permissions: cfg.dangerously_skip_permissions } : {}),
+    ...(cfg.skills && cfg.skills.length ? { skills: cfg.skills } : {}),
   };
   const frontmatter = `---\n${yaml.dump(frontmatterObj, { lineWidth: -1 })}---\n\n`;
 

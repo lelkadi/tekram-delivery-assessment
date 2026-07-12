@@ -19,6 +19,8 @@ deliverable.
 | [TD-008](#td-008--qa-persists-a-black-box-e2e-suite-per-issue-one-fact-per-ac) | QA persists a black-box e2e suite per issue (one fact per AC) | Accepted | Suite runtime slows the gate materially, or P4 UI needs true browser e2e |
 | [TD-009](#td-009--qa-dual-gate-on-opencode--deepseek-v4-pro) | QA dual-gate on opencode / deepseek-v4-pro | Accepted | — |
 | [TD-010](#td-010--architect-review-dual-gate-on-opencode--gpt-55) | Architect-review dual-gate on opencode / GPT-5.5 | Accepted | Correlated architect misses observed, or GPT-5.5 regresses significantly vs Claude Opus |
+| [TD-011](#td-011--architect-review-third-gate-on-antigravity--gemini-35-flash) | Architect-review third gate on antigravity / Gemini 3.5 Flash | Accepted | — |
+| [TD-012](#td-012--engineering-lead-gate-on-antigravity--gemini-35-flash) | Engineering Lead gate on antigravity / Gemini 3.5 Flash | Accepted | — |
 
 ---
 
@@ -105,8 +107,8 @@ seeded this whole document set — explicitly directs a "highly scalable, produc
 Core platform, using Scalar for API documentation." That direction was never contradicted or
 walked back in any later doc, so it stands as the real stack decision; it just hadn't been
 codified here yet. This entry closes that gap so the architect/engineer split (§ARCHITECT_SPEC,
-`.ai-roster/backend_instructions.md`) has one unambiguous source of truth instead of the generic
-Node/Fastify boilerplate left over in `.ai-roster/architect_spec_instructions.md` from the
+`.ai-roster/agents/backend_instructions.md`) has one unambiguous source of truth instead of the generic
+Node/Fastify boilerplate left over in `.ai-roster/agents/architect_spec_instructions.md` from the
 roster's other project (Careeree) — that file's STACK CONTRACT does **not** apply to this repo.
 
 **Decision.**
@@ -354,3 +356,33 @@ This completes three-family diversity across the review chain:
 
 **Revisit trigger.** Evidence of correlated misses between the two architect agents, or
 GPT-5.5 quality regression relative to Claude Opus on code review tasks.
+
+## TD-011 — Architect-review third gate on antigravity / Gemini 3.5 Flash
+
+**Status:** Accepted
+**Date:** 2026-07-12
+
+**Context.** In TD-010, the architect-review process was structured as a dual-gate (Claude Opus on claude-code and GPT-5.5 on opencode) to ensure third-family model independence at the final code review layer. However, additional runtime diversity was desired to avoid relying solely on the Anthropic/OpenAI API/tooling infrastructure.
+
+**Decision.** Add a third review gate running on the `antigravity` environment using the `Gemini 3.5 Flash` model. The three reviewer gates (Claude Opus, GPT-5.5, Gemini 3.5 Flash) review the issue independently. The first ACCEPT merges and closes the PR.
+
+**Rejected alternatives.**
+- *Run all gates on one runtime:* leaves the workflow vulnerable to runtime CLI/API outages.
+- *Sequential review:* too slow for developer loop.
+
+**Revisit trigger.** Quality degradation of Gemini 3.5 Flash on code review tasks, or high rate of false rejects.
+
+## TD-012 — Engineering Lead gate on antigravity / Gemini 3.5 Flash
+
+**Status:** Accepted
+**Date:** 2026-07-12
+
+**Context.** The Engineering Lead (`eng-lead`) acts as the code-issue orchestrator, preparing the developer's worktree, compiling briefs, dispatching engineers, verifying their commits, and publishing PRs. It originally runs on `opencode` with `deepseek-v4-pro`. To ensure runtime diversity at the orchestration level, a version running on the `antigravity` environment is needed.
+
+**Decision.** Create a new version of the Engineering Lead (`eng-lead-antigravity`) running on the `antigravity` environment with the `Gemini 3.5 Flash` model.
+
+**Rejected alternatives.**
+- *Only use opencode:* leaves the orchestration gate vulnerable to a single runtime or provider outage.
+
+**Revisit trigger.** Gemini 3.5 Flash failing to write precise engineering briefs or verify diffs correctly.
+

@@ -16,6 +16,7 @@ priorities: [docs/00-project-management-plan.md](../docs/00-project-management-p
 | `researcher` | claude-code / sonnet | Reference gathering + first drafts of written deliverables. Posts one greppable "Research Notes" comment per issue. |
 | `architect-spec` | opencode / deepseek-v4-pro | Part 1 architecture + diagrams, Part 3 schema, Part 2 spec (endpoints, layers, DTOs). Moves code issues `2-needs-spec → 3-ready-for-dev`. |
 | `eng-lead` | opencode / deepseek-v4-pro | Orchestrates `type:code` issues: fetches, briefs engineers with self-contained tasks, verifies their local commits, publishes (push+PR+label), hands off to QA/architect-review. Never implements. |
+| `eng-lead-antigravity` | antigravity / Gemini 3.5 Flash | Orchestrates `type:code` issues in the antigravity runtime (Gemini 3.5 Flash). Same protocol as `eng-lead`. |
 | `backend-engineer` | opencode / deepseek-v4-flash | Implements a eng-lead brief in `src/**` + `tests/**` (hard write scope). Commits locally; never pushes, never touches GitHub. |
 | `web-engineer` | opencode / deepseek-v4-flash | **P4 bonus only** — implements a eng-lead brief in `web/**`, spun up only after all P0–P3 deliverables exist. |
 | `qa` | **claude-code / sonnet (effort: high)** | Code issues only: checks out the PR branch in its own worktree, writes a **black-box e2e suite from the issue's acceptance criteria** (`tests/e2e/<Module>/<Feature>Tests.cs`, one fact per AC, classes tagged `[Trait("issue","<n>")]` — committed and pushed onto the PR branch, PASS or FAIL), runs it plus the engineer's tests against the real lane stack, verdict `6-qa-failed` / `7-qa-passed`. Gate independence comes from **method** (persistent machine-checkable tests, decorrelated from the engineers' in-process style), not model family — see [technical-decisions.md](../docs/technical-decisions.md) TD-007/TD-008 (supersedes TD-006's Gemini/antigravity choice). |
@@ -54,7 +55,7 @@ Research and spec happen *inside* the draft step. Rework = review comment + move
 ## A work issue's life, step by step (code issue — eng-lead orchestrated)
 
 Engineers never touch GitHub. `eng-lead` owns every `github_flow.sh` call on a code issue
-except the engineer's local commit itself; see [eng_lead_instructions.md](eng_lead_instructions.md)
+except the engineer's local commit itself; see [eng_lead_instructions.md](agents/eng_lead_instructions.md)
 and [rules/delegation.md](rules/delegation.md) for the full contract.
 
 1. `pm-doc-intake` creates the issue (labels: `part-N`, `priority:*`, `type:code`, status) with
