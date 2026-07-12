@@ -70,6 +70,13 @@ agents:
     mode: "accept-edits"
     dangerously_skip_permissions: true
     write_scope: []
+    tools:
+      - view_file
+      - list_dir
+      - grep_search
+      - write_to_file
+      - replace_file_content
+      - run_command
     instructions_file: "eng_lead_instructions.md"
     skills: ["github_flow"]
 
@@ -246,6 +253,13 @@ agents:
     thinking: "high"
     mode: "accept-edits"
     dangerously_skip_permissions: true
+    tools:
+      - view_file
+      - list_dir
+      - grep_search
+      - write_to_file
+      - replace_file_content
+      - run_command
     instructions_file: "architect_review_instructions.md"
     skills: ["github_flow"]
 
