@@ -5,53 +5,56 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.DependencyInjection;
-using Tekram.Api.src.auth.Application.Interfaces;
-using Tekram.Api.src.auth.Domain;
-using Tekram.Api.src.shared;
 
 /// <summary>
 /// Black-box HTTP e2e tests for POST /api/food/orders (issue #16).
-/// Uses WebApplicationFactory against the lane PostgreSQL database.
-/// Verifies all acceptance criteria: 201, 401, 403, 422.
+///
+/// Verifies against the live API at E2E_BASE_URL, per the shared LiveFact/LiveApiTestBase
+/// convention introduced by issue #60 (replaces the earlier in-process
+/// WebApplicationFactory&lt;Program&gt; approach, which duplicated its own host/DB
+/// bring-up and broke once the lane's DATABASE_URL moved to the postgres:// URI form —
+/// Npgsql's connection-string parser doesn't accept that form directly).
+///
+/// The one piece of direct DB access here (seeding known OTP codes so registration can
+/// be verified without a real mail/SMS provider) uses the same raw-Npgsql,
+/// no-ProjectReference-to-src carve-out established in Shared/SharedKernelTests.cs —
+/// the URI is parsed by hand into an NpgsqlConnectionStringBuilder.
+///
+/// Verifies all acceptance criteria: 201, 401, 403, 422, 409.
 /// </summary>
 [Trait("issue", "16")]
-public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
+public class OrdersHandlerTests : LiveApiTestBase, IAsyncLifetime
 {
-    private readonly WebApplicationFactory<Program> _factory;
-    private HttpClient _client = null!;
+    private static readonly string DatabaseUrl =
+        Environment.GetEnvironmentVariable("E2E_DATABASE_URL")
+        ?? Environment.GetEnvironmentVariable("DATABASE_URL")
+        ?? "postgres://postgres:postgres@localhost:5432/tekram_lane2";
+
+    private string _token = null!;
     private Guid _restaurantId;
     private Guid _menuItemId;
 
-    public OrdersHandlerTests(WebApplicationFactory<Program> factory)
-    {
-        _factory = factory.WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("ConnectionStrings:DefaultConnection",
-                Environment.GetEnvironmentVariable("E2E_DATABASE_URL")
-                ?? Environment.GetEnvironmentVariable("DATABASE_URL")
-                ?? "Host=localhost;Port=5432;Database=tekram;Username=postgres;Password=postgres");
-            builder.UseSetting("EMAIL_MOCK", "true");
-            builder.UseSetting("SMS_MOCK", "true");
-        });
-    }
-
     public async Task InitializeAsync()
     {
-        (_client, _, _) = await RegisterVerifiedUserAsync();
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
-        _restaurantId = db.Restaurants.First(r => r.Status == "active" && r.DeletedAt == null).Id;
-        // Deterministic pick: highest-priced eligible item (tiebreak by Id) so qty=2 reliably
-        // clears WELCOME10's $10 MinSubtotalUsd across every seeded restaurant (see DbInitializer.cs) —
-        // an unordered .First() previously let Postgres return any matching row, sometimes a cheap
-        // item that made AC5_PlaceOrder_ValidCoupon_AppliesDiscount flaky/red (issue #16).
-        _menuItemId = db.MenuItems
-            .Where(m => m.RestaurantId == _restaurantId && m.DeletedAt == null
-                && (m.StockCount == null || m.StockCount > 0))
-            .OrderByDescending(m => m.PriceUsd)
-            .ThenBy(m => m.Id)
+        _token = await RegisterVerifiedUserAsync();
+
+        // Discover a real restaurant + its highest-priced available item via HTTP.
+        // Deterministic pick (highest price, tiebreak by Id) so qty=2 reliably clears
+        // WELCOME10's $10 MinSubtotalUsd across every seeded restaurant — an unordered
+        // pick previously let a cheap item make AC5 flaky/red (issue #16).
+        var listResp = await Client.GetAsync("/api/food/restaurants?limit=50");
+        var listJson = await listResp.Content.ReadFromJsonAsync<JsonElement>();
+        _restaurantId = listJson.GetProperty("data")[0].GetProperty("id").GetGuid();
+
+        var menuResp = await Client.GetAsync($"/api/food/restaurants/{_restaurantId}/menu");
+        var menuJson = await menuResp.Content.ReadFromJsonAsync<JsonElement>();
+
+        _menuItemId = menuJson.GetProperty("categories").EnumerateArray()
+            .SelectMany(c => c.GetProperty("items").EnumerateArray())
+            .Where(i => i.GetProperty("isAvailable").GetBoolean())
+            .Select(i => (Id: i.GetProperty("id").GetGuid(), Price: i.GetProperty("priceUsd").GetDecimal()))
+            .OrderByDescending(i => i.Price)
+            .ThenBy(i => i.Id)
             .First().Id;
     }
 
@@ -59,45 +62,67 @@ public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>,
 
     // ── Helpers ───────────────────────────────────────────────────────
 
-    private async Task<(HttpClient Client, string Token, Guid UserId)> RegisterVerifiedUserAsync()
+    private async Task<string> RegisterVerifiedUserAsync()
     {
-        var client = _factory.CreateClient();
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var email = $"e2e{suffix}@test.com";
         var phone = $"+96170{Random.Shared.Next(10000, 99999)}";
 
-        // Register
-        var reg = await client.PostAsJsonAsync("/api/auth/register", new
+        var reg = await Client.PostAsJsonAsync("/api/auth/register", new
         { name = "E2E User", email, phone, password = "Password1", role = "customer" });
         reg.EnsureSuccessStatusCode();
         var auth = await reg.Content.ReadFromJsonAsync<JsonElement>();
-        var token = auth.GetProperty("token").GetString()!;
         var userId = auth.GetProperty("id").GetGuid();
+        var regToken = auth.GetProperty("token").GetString();
 
-        // Insert known OTP codes directly into DB
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<TekramDbContext>();
-        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-        var hash = hasher.Hash("123456");
-        db.OtpCodes.Add(new OtpCode { Id = Guid.NewGuid(), UserId = userId, Channel = "email", CodeHash = hash, ExpiresAt = DateTime.UtcNow.AddMinutes(10), CreatedAt = DateTime.UtcNow });
-        db.OtpCodes.Add(new OtpCode { Id = Guid.NewGuid(), UserId = userId, Channel = "phone", CodeHash = hash, ExpiresAt = DateTime.UtcNow.AddMinutes(10), CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
+        // Seed helper: insert known OTP codes directly (raw Npgsql, no EF, no
+        // ProjectReference to src/**) so verification can complete black-box.
+        InsertKnownOtpCodes(userId);
 
-        // Verify both channels
-        var regClient = _factory.CreateClient();
-        regClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        await regClient.PostAsJsonAsync("/api/auth/verify/email", new { code = "123456" });
-        await regClient.PostAsJsonAsync("/api/auth/verify/phone", new { code = "123456" });
+        using var verifyClient = NewClient();
+        verifyClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", regToken);
+        await verifyClient.PostAsJsonAsync("/api/auth/verify/email", new { code = "123456" });
+        await verifyClient.PostAsJsonAsync("/api/auth/verify/phone", new { code = "123456" });
 
-        // Re-login
-        var login = await client.PostAsJsonAsync("/api/auth/login", new { identifier = email, password = "Password1" });
+        var login = await Client.PostAsJsonAsync("/api/auth/login",
+            new { identifier = email, password = "Password1" });
         login.EnsureSuccessStatusCode();
         var loginAuth = await login.Content.ReadFromJsonAsync<JsonElement>();
-        var verifiedToken = loginAuth.GetProperty("token").GetString()!;
+        return loginAuth.GetProperty("token").GetString()!;
+    }
 
-        var authClient = _factory.CreateClient();
-        authClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", verifiedToken);
-        return (authClient, verifiedToken, userId);
+    private static void InsertKnownOtpCodes(Guid userId)
+    {
+        var uri = new Uri(DatabaseUrl);
+        var userInfo = uri.UserInfo.Split(':');
+        var csb = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Database = uri.AbsolutePath.TrimStart('/'),
+            Username = userInfo[0],
+            Password = userInfo.Length > 1 ? userInfo[1] : string.Empty,
+        };
+
+        using var conn = new Npgsql.NpgsqlConnection(csb.ConnectionString);
+        conn.Open();
+
+        var hash = BCrypt.Net.BCrypt.HashPassword("123456", 12);
+
+        foreach (var channel in new[] { "email", "phone" })
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "INSERT INTO auth.otp_codes (id, user_id, channel, code_hash, expires_at, created_at) " +
+                "VALUES (@id, @user_id, @channel, @code_hash, @expires_at, @created_at)";
+            cmd.Parameters.AddWithValue("id", Guid.NewGuid());
+            cmd.Parameters.AddWithValue("user_id", userId);
+            cmd.Parameters.AddWithValue("channel", channel);
+            cmd.Parameters.AddWithValue("code_hash", hash);
+            cmd.Parameters.AddWithValue("expires_at", DateTime.UtcNow.AddMinutes(10));
+            cmd.Parameters.AddWithValue("created_at", DateTime.UtcNow);
+            cmd.ExecuteNonQuery();
+        }
     }
 
     private object OrderBody(Guid? itemId = null, int qty = 1, string? coupon = null) => new
@@ -109,12 +134,20 @@ public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>,
         couponCode = coupon
     };
 
+    private HttpClient AuthedClient()
+    {
+        var client = NewClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        return client;
+    }
+
     // ── AC: 201 on valid order ──────────────────────────────────────────
 
-    [Fact]
+    [LiveFact]
     public async Task AC1_PlaceOrder_ValidRequest_Returns201()
     {
-        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody());
+        using var client = AuthedClient();
+        var response = await client.PostAsJsonAsync("/api/food/orders", OrderBody());
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("bookingId").GetGuid().Should().NotBeEmpty();
@@ -125,27 +158,26 @@ public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>,
 
     // ── AC: 401 without auth ────────────────────────────────────────────
 
-    [Fact]
+    [LiveFact]
     public async Task AC2_PlaceOrder_NoAuth_Returns401()
     {
-        var anon = _factory.CreateClient();
+        using var anon = NewClient();
         var response = await anon.PostAsJsonAsync("/api/food/orders", OrderBody());
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // ── AC: 403 when user not verified ──────────────────────────────────
 
-    [Fact]
+    [LiveFact]
     public async Task AC3_PlaceOrder_UnverifiedUser_Returns403()
     {
-        var client = _factory.CreateClient();
         var suffix = Guid.NewGuid().ToString("N")[..8];
-        var reg = await client.PostAsJsonAsync("/api/auth/register", new
+        var reg = await Client.PostAsJsonAsync("/api/auth/register", new
         { name = "UV", email = $"uv{suffix}@t.com", phone = $"+96170{Random.Shared.Next(10000, 99999)}", password = "Password1", role = "customer" });
         reg.EnsureSuccessStatusCode();
         var token = (await reg.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString();
 
-        var uvClient = _factory.CreateClient();
+        using var uvClient = NewClient();
         uvClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await uvClient.PostAsJsonAsync("/api/food/orders", OrderBody());
@@ -155,20 +187,22 @@ public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>,
 
     // ── AC: 422 when coupon invalid ─────────────────────────────────────
 
-    [Fact]
+    [LiveFact]
     public async Task AC4_PlaceOrder_InvalidCoupon_Returns422()
     {
-        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody(coupon: "NONEXISTENT"));
+        using var client = AuthedClient();
+        var response = await client.PostAsJsonAsync("/api/food/orders", OrderBody(coupon: "NONEXISTENT"));
         response.StatusCode.Should().Be((HttpStatusCode)422);
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString().Should().Be("invalid_coupon");
     }
 
     // ── AC: Valid coupon applies discount ────────────────────────────────
 
-    [Fact]
+    [LiveFact]
     public async Task AC5_PlaceOrder_ValidCoupon_AppliesDiscount()
     {
-        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody(qty: 2, coupon: "WELCOME10"));
+        using var client = AuthedClient();
+        var response = await client.PostAsJsonAsync("/api/food/orders", OrderBody(qty: 2, coupon: "WELCOME10"));
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var totals = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("totals");
         totals.GetProperty("discountUsd").GetDecimal().Should().BeGreaterThan(0);
@@ -176,10 +210,11 @@ public class OrdersHandlerTests : IClassFixture<WebApplicationFactory<Program>>,
 
     // ── AC: 409 when item unavailable ────────────────────────────────────
 
-    [Fact]
+    [LiveFact]
     public async Task AC6_PlaceOrder_NonExistentItem_Returns409()
     {
-        var response = await _client.PostAsJsonAsync("/api/food/orders", OrderBody(itemId: Guid.NewGuid()));
+        using var client = AuthedClient();
+        var response = await client.PostAsJsonAsync("/api/food/orders", OrderBody(itemId: Guid.NewGuid()));
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetString().Should().Be("item_unavailable");
     }
